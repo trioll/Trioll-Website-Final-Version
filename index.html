@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSAP ScrollTrigger Tube Demo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <div class="loading-logo">TRIOLL</div>
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <div class="loading-text">INITIALIZING EXPERIENCE</div>
+            <div class="loading-progress">
+                <div class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas class="experience"></canvas>
+    <div class="scrollTarget"></div>
+    <div class="vignette-radial"></div>
+    
+    <!-- White transition overlay -->
+    <div class="white-transition" id="whiteTransition">
+        <div class="ripple-1"></div>
+        <div class="ripple-2"></div>
+        <div class="ripple-3"></div>
+    </div>
+    
+    <!-- REQUEST ACCESS Button -->
+    <button class="request-access-btn">REQUEST ACCESS</button>
+    
+    <!-- Landing Page -->
+    <div class="landing-page" id="landingPage">
+        <!-- Starfield Background -->
+        <canvas class="starfield-canvas" id="starfieldCanvas"></canvas>
+        
+        <!-- Main Content -->
+        <div class="landing-content">
+            <!-- Header -->
+            <header class="landing-header">
+                <div class="header-left">
+                    <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll Logo" class="header-logo">
+                    <div class="logo-section">
+                        <h1 class="company-name">TRIOLL</h1>
+                        <span class="tagline">NEXT-GEN GAME DISCOVERY</span>
+                    </div>
+                </div>
+                <nav class="main-nav">
+                    <a href="#" class="nav-link" id="platformLink">PLATFORM</a>
+                    <a href="#" class="nav-link" id="developersLink">DEVELOPERS</a>
+                    <a href="#" class="nav-link" id="gamersLink">GAMERS</a>
+                    <a href="mailto:info@trioll.com" class="nav-link">CONTACT US</a>
+                </nav>
+            </header>
+            
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <h2 class="hero-title scroll-reveal">THE FUTURE OF<br>GAME DISCOVERY</h2>
+                <p class="hero-subtitle scroll-reveal">AI-powered matchmaking between gamers and games</p>
+                <div class="cta-buttons scroll-reveal">
+                    <button class="cta-primary" id="joinBetaBtn">JOIN US</button>
+                </div>
+            </section>
+            
+            <!-- Features Grid -->
+            <section class="features-grid">
+                <div class="feature-card scroll-reveal">
+                    <h3>For Gamers</h3>
+                    <p>Discover and shape games before they launch. Your feedback and engagement directly influence the games you'll love to play.</p>
+                </div>
+                <div class="feature-card scroll-reveal">
+                    <h3>For Developers</h3>
+                    <p>Build games with your community, not in isolation. Get real player insights at every stage to create games that truly resonate with your audience.</p>
+                </div>
+                <div class="feature-card scroll-reveal">
+                    <h3>AI-Powered</h3>
+                    <p>Intelligent matchmaking connects the right players with relevant projects. Smart analytics transform player behavior into actionable development insights.</p>
+                </div>
+            </section>
+            
+            <!-- Interactive Dot Grid -->
+            <canvas class="dot-grid" id="dotGrid"></canvas>
+            
+            <!-- What is Trioll? Section -->
+            <section class="about-section">
+                <h2 class="section-title scroll-reveal">What is Trioll?</h2>
+                <p class="section-content scroll-reveal">
+                    TRIOLL transforms game development into a collaborative journey between developers and players. 
+                    Our cloud-based platform enables developers to seamlessly share interactive game experiences 
+                    with their community throughout the development process, fostering unprecedented collaboration 
+                    between creators and players.
+                </p>
+            </section>
+            
+            <!-- Meet the Team Section -->
+            <section class="team-section">
+                <h2 class="section-title scroll-reveal">Meet the Team</h2>
+                <div class="team-grid">
+                    <div class="team-member scroll-reveal">
+                        <div class="member-image">
+                            <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/yoavcropped.png" alt="Yoav Lester">
+                        </div>
+                        <h3 class="member-name">Yoav Lester</h3>
+                        <p class="member-role">Co-Founder</p>
+                        <p class="member-bio">Visionary leader passionate about democratizing mobile gaming. 10+ years in creative innovation.</p>
+                    </div>
+                    <div class="team-member scroll-reveal">
+                        <div class="member-image">
+                            <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Freddie%20Caplin.png" alt="Frederick Caplin">
+                        </div>
+                        <h3 class="member-name">Frederick Caplin</h3>
+                        <p class="member-role">Co-Founder</p>
+                        <p class="member-bio">Technical architect behind Trioll's streaming technology. Expert in cloud gaming and mobile optimization.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    
+    <!-- REQUEST ACCESS Modal -->
+    <div class="modal-overlay" id="requestModal">
+        <div class="modal-container">
+            <button class="modal-close">&times;</button>
+            <h1 class="modal-title">JOIN THE GAME<br>DISCOVERY REVOLUTION</h1>
+            <p class="modal-subtitle">Private Beta. Limited spots.</p>
+            
+            <form class="modal-form">
+                <div class="form-group">
+                    <label>I am a...</label>
+                    <select class="form-select" required>
+                        <option value="" disabled selected>Choose one</option>
+                        <option value="gamer">Gamer - Want early access</option>
+                        <option value="developer">Game Developer - Want early access</option>
+                        <option value="investor">Investor - Interested in opportunities</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Enter your email</label>
+                    <input type="email" class="form-input" placeholder="your@email.com" required>
+                </div>
+                
+                <button type="submit" class="form-submit">CLICK HERE TO JOIN</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- JOIN BETA Modal -->
+    <div class="modal-overlay" id="joinBetaModal">
+        <div class="modal-container join-beta-modal">
+            <button class="modal-close" id="joinBetaClose">&times;</button>
+            <h1 class="modal-title">JOIN THE GAME<br>DISCOVERY REVOLUTION</h1>
+            <p class="modal-subtitle">Private Beta. Limited spots.</p>
+            
+            <form class="modal-form" id="joinBetaForm">
+                <div class="form-group">
+                    <label>I AM A...</label>
+                    <div class="dropdown-wrapper">
+                        <select class="form-select styled-select" required>
+                            <option value="" disabled selected>Choose one</option>
+                            <option value="gamer">Gamer - Want early access</option>
+                            <option value="developer">Game Developer - Want early access</option>
+                            <option value="investor">Investor - Interested in opportunities</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Enter your email</label>
+                    <input type="email" class="form-input" placeholder="your@email.com" required>
+                </div>
+                
+                <button type="submit" class="form-submit join-submit">CLICK HERE TO JOIN</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Platform Password Modal -->
+    <div class="modal-overlay" id="platformPasswordModal">
+        <div class="modal-container platform-password-modal">
+            <button class="modal-close" id="platformPasswordClose">&times;</button>
+            <h1 class="modal-title">PLATFORM ACCESS</h1>
+            <p class="modal-subtitle">Enter password to access the platform</p>
+            
+            <form class="modal-form" id="platformPasswordForm">
+                <div class="form-group">
+                    <label>PASSWORD</label>
+                    <input type="password" class="form-input" id="platformPassword" placeholder="Enter password" required>
+                </div>
+                
+                <button type="submit" class="form-submit platform-submit">ACCESS PLATFORM</button>
+                
+                <div class="password-error" id="passwordError" style="display: none;">
+                    Incorrect password. Please try again.
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Three.js Effect Composer -->
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    
+    <!-- Three.js Font Loader and Text Geometry -->
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/geometries/TextGeometry.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    
+    <!-- GSAP and ScrollTrigger -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    
+    <!-- Troika Three Text -->
+    <script>
+        // Load Troika after Three.js is available
+        window.addEventListener('load', function() {
+            // Simple text ring without Troika - using Three.js TextGeometry
+            window.createTextRing = true;
+        });
+    </script>
+    
+    <!-- Main Script -->
+    <script src="main.js"></script>
+</body>
+</html>
