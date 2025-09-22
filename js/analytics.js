@@ -99,6 +99,12 @@ class AnalyticsService {
             }
             return;
         }
+        
+        // TEMPORARY: Skip analytics to avoid 403 errors
+        // TODO: Fix analytics endpoint to accept guest requests
+        Logger.log('Analytics: Temporarily disabled to avoid 403 errors');
+        this.events = []; // Clear events without sending
+        return;
 
         const events = [...this.events];
         this.events = [];
