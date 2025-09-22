@@ -17,12 +17,20 @@ class TriollAPI {
         const headers = {
             'Content-Type': 'application/json',
             'X-Platform': 'pc',
-            'X-App-Source': 'web',
-            'X-Device-Type': Analytics ? Analytics.getDeviceType() : 'desktop',
-            'X-Browser': Analytics ? Analytics.getBrowser() : navigator.userAgent.substr(0, 50),
-            'X-OS': Analytics ? Analytics.getOS() : navigator.platform,
-            'X-Screen-Resolution': `${window.screen.width}x${window.screen.height}`
+            'X-App-Source': 'web'
         };
+
+        // Add device info if Analytics is available
+        try {
+            if (typeof Analytics !== 'undefined' && Analytics.getDeviceType) {
+                headers['X-Device-Type'] = Analytics.getDeviceType();
+                headers['X-Browser'] = Analytics.getBrowser();
+                headers['X-OS'] = Analytics.getOS();
+                headers['X-Screen-Resolution'] = `${window.screen.width}x${window.screen.height}`;
+            }
+        } catch (e) {
+            // Ignore if Analytics isn't ready yet
+        }
 
         // Only add authorization if we have a valid token
         if (typeof Auth !== 'undefined' && Auth.getIdToken) {
