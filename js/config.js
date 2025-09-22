@@ -84,7 +84,7 @@ if (window.location.protocol === 'file:') {
     Config.ENV = 'development';
     // Use production API for now since local dev server isn't set up
     Config.FEATURES.ENABLE_ADS = false;
-} else if (window.location.hostname === 'play.trioll.com') {
+} else if (window.location.hostname === 'play.trioll.com' || window.location.hostname === 'trioll.com' || window.location.hostname === 'www.trioll.com') {
     Config.ENV = 'production';
 } else {
     Config.ENV = 'staging';
