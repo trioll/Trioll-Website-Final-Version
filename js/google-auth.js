@@ -353,7 +353,7 @@ class GoogleAuthService {
                 }
             }).catch(error => {
                 console.error('Failed to initialize for prompt:', error);
-                alert('Google Sign-In is currently unavailable. Please use email login instead.');
+                // Don't show alert here - only show when user actively clicks
             });
             return;
         }
@@ -368,8 +368,8 @@ class GoogleAuthService {
                     // Show custom button as fallback
                     const reason = notification.getNotDisplayedReason();
                     if (reason === 'suppressed_by_user' || reason === 'opt_out_or_no_session') {
-                        // Try to show the One Tap button in a different way
-                        alert('Please enable third-party cookies or try using the standard Google Sign-In button.');
+                        // Log the issue but don't show alert
+                        console.log('Google Sign-In suppressed:', reason);
                     }
                 }
                 
@@ -380,7 +380,7 @@ class GoogleAuthService {
             });
         } catch (error) {
             console.error('Error showing Google prompt:', error);
-            alert('Unable to show Google Sign-In. Please check your browser settings and try again.');
+            // Only log the error, don't show alert unless user clicked
         }
     }
 }

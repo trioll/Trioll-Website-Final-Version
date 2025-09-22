@@ -606,10 +606,24 @@
         
         // Handle Google Sign-In button click
         function handleGoogleSignIn() {
+            console.log('Google Sign-In button clicked');
             if (window.GoogleAuth && GoogleAuth.initialized) {
+                console.log('Showing Google prompt...');
                 GoogleAuth.prompt();
             } else {
-                alert('Google Sign-In is not available. Please try again later or use email login.');
+                console.log('Google Sign-In not ready, trying to initialize...');
+                // Try to initialize first
+                if (window.GoogleAuth && !GoogleAuth.initialized) {
+                    initializeGoogleAuth().then(() => {
+                        if (GoogleAuth.initialized) {
+                            GoogleAuth.prompt();
+                        } else {
+                            alert('Google Sign-In is not available. Please try again later or use email login.');
+                        }
+                    });
+                } else {
+                    alert('Google Sign-In is not available. Please try again later or use email login.');
+                }
             }
         }
         
