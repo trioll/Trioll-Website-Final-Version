@@ -324,6 +324,39 @@
         let commentsPage = 1;
         let hasMoreComments = true;
         
+        // Function to sync local likes to backend
+        async function syncLocalLikes() {
+            const localLikes = JSON.parse(localStorage.getItem('trioll_liked_games') || '{}');
+            const gameIds = Object.keys(localLikes);
+            
+            if (gameIds.length === 0) return;
+            
+            Logger.log('Syncing local likes to backend:', gameIds.length, 'games');
+            
+            let syncedCount = 0;
+            for (const gameId of gameIds) {
+                try {
+                    await API.likeGame(gameId);
+                    syncedCount++;
+                    // Remove from local storage after successful sync
+                    delete localLikes[gameId];
+                } catch (error) {
+                    Logger.warn('Failed to sync like for game:', gameId);
+                }
+            }
+            
+            // Update local storage with remaining unsynced likes
+            if (Object.keys(localLikes).length > 0) {
+                localStorage.setItem('trioll_liked_games', JSON.stringify(localLikes));
+            } else {
+                localStorage.removeItem('trioll_liked_games');
+            }
+            
+            if (syncedCount > 0) {
+                Logger.log(`Successfully synced ${syncedCount} likes to backend`);
+            }
+        }
+        
         // Debug: Check if elements exist
         Logger.log('🔍 Initial page check:', {
             loadingScreen: document.getElementById('loadingScreen'),
@@ -346,6 +379,11 @@
             if (!Auth.isAuthenticated() && !Auth.isGuest) {
                 window.location.href = 'login.html';
                 return;
+            }
+            
+            // Try to sync local likes if authenticated
+            if (Auth.isAuthenticated()) {
+                syncLocalLikes().catch(err => Logger.warn('Failed to sync likes:', err));
             }
             
             try {
@@ -555,14 +593,30 @@
                     
                     updateLikeButton();
                     
-                    Analytics.track('game_like', {
+                    // ALWAYS track analytics, even for guests
+                    const analyticsData = {
                         gameId: currentGame.id,
                         gameName: currentGame.name,
                         action: isLiked ? 'like' : 'unlike',
                         source: 'web',
                         platform: 'pc',
-                        device: Analytics.getDeviceType()
-                    });
+                        device: Analytics.getDeviceType(),
+                        isGuest: Auth.isGuest || false,
+                        userId: Auth.getCurrentUserId() || Auth.getGuestId() || 'anonymous',
+                        localStorage: true, // Flag that this was stored locally
+                        timestamp: Date.now()
+                    };
+                    
+                    // Track the like event
+                    Analytics.track('game_like', analyticsData);
+                    
+                    // Also track a specific guest interaction event if guest
+                    if (Auth.isGuest) {
+                        Analytics.track('guest_game_interaction', {
+                            ...analyticsData,
+                            interactionType: 'like'
+                        });
+                    }
                 } catch (error) {
                     Logger.error('Failed to update like:', error);
                     // Don't show alert - we handled it gracefully with local storage
