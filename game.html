@@ -502,7 +502,22 @@
         
         function setupActionButtons() {
             // Like button
-            document.getElementById('likeBtn').addEventListener('click', async () => {
+            const likeBtn = document.getElementById('likeBtn');
+            if (!likeBtn) {
+                Logger.error('Like button not found!');
+                return;
+            }
+            
+            Logger.log('Setting up like button for game:', currentGame?.id);
+            
+            likeBtn.addEventListener('click', async () => {
+                Logger.log('Like button clicked! Current state:', { isLiked, likeCount: currentGame?.likeCount });
+                
+                if (!currentGame || !currentGame.id) {
+                    alert('Game not loaded yet. Please wait a moment and try again.');
+                    return;
+                }
+                
                 // Allow guests to like on web platform
                 // if (Auth.isGuest) {
                 //     alert('Please login to like games');
@@ -532,6 +547,7 @@
                     });
                 } catch (error) {
                     Logger.error('Failed to update like:', error);
+                    alert('Failed to update like: ' + error.message);
                 }
             });
             
