@@ -104,6 +104,32 @@
             opacity: 1;
             transform: scale(1.2);
         }
+        
+        /* Fix for game action buttons */
+        .game-actions {
+            position: relative !important;
+            z-index: 10;
+            pointer-events: auto !important;
+        }
+        
+        .game-actions .action-btn {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            position: relative;
+            z-index: 11;
+        }
+        
+        /* Ensure game container doesn't overlap buttons */
+        #gameContainer {
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Debug - add visual feedback */
+        .action-btn:active {
+            transform: scale(0.95) !important;
+            background: rgba(255, 255, 255, 0.3) !important;
+        }
     </style>
 </head>
 <body>
@@ -573,18 +599,33 @@
         });
         
         function setupActionButtons() {
+            // Debug - log button setup
+            console.log('🎮 Setting up action buttons...');
+            
             // Like button
             const likeBtn = document.getElementById('likeBtn');
             if (!likeBtn) {
                 Logger.error('Like button not found!');
+                console.error('❌ Like button element not found in DOM');
+                return;
+            }
+            
+            // Check if button is already setup (avoid duplicate listeners)
+            if (likeBtn.hasAttribute('data-listener-attached')) {
+                console.log('⚠️ Like button already has listener attached, skipping');
                 return;
             }
             
             Logger.log('Setting up like button for game:', currentGame?.id);
+            console.log('✅ Like button found, attaching listener');
             
-            likeBtn.addEventListener('click', async () => {
+            likeBtn.setAttribute('data-listener-attached', 'true');
+            
+            likeBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 Logger.log('Like button clicked! Current state:', { isLiked, likeCount: currentGame?.likeCount });
-                console.log('❤️ LIKE BUTTON CLICKED!', { isLiked, gameId: currentGame?.id });
+                console.log('❤️ LIKE BUTTON CLICKED!', { isLiked, gameId: currentGame?.id, event: e });
                 
                 if (!currentGame || !currentGame.id) {
                     alert('Game not loaded yet. Please wait a moment and try again.');
@@ -659,12 +700,27 @@
             });
             
             // Rate button
-            document.getElementById('rateBtn').addEventListener('click', () => {
-                document.getElementById('ratingModal').classList.remove('hidden');
-            });
+            const rateBtn = document.getElementById('rateBtn');
+            if (rateBtn && !rateBtn.hasAttribute('data-listener-attached')) {
+                console.log('✅ Rate button found, attaching listener');
+                rateBtn.setAttribute('data-listener-attached', 'true');
+                rateBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('⭐ RATE BUTTON CLICKED!');
+                    document.getElementById('ratingModal').classList.remove('hidden');
+                });
+            }
             
             // Share button
-            document.getElementById('shareBtn').addEventListener('click', async () => {
+            const shareBtn = document.getElementById('shareBtn');
+            if (shareBtn && !shareBtn.hasAttribute('data-listener-attached')) {
+                console.log('✅ Share button found, attaching listener');
+                shareBtn.setAttribute('data-listener-attached', 'true');
+                shareBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔗 SHARE BUTTON CLICKED!');
                 const url = window.location.href;
                 if (navigator.share) {
                     try {
@@ -755,7 +811,14 @@
             });
             
             // Fullscreen button
-            document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            if (fullscreenBtn && !fullscreenBtn.hasAttribute('data-listener-attached')) {
+                console.log('✅ Fullscreen button found, attaching listener');
+                fullscreenBtn.setAttribute('data-listener-attached', 'true');
+                fullscreenBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('⛶ FULLSCREEN BUTTON CLICKED!');
                 const iframe = document.getElementById('gameIframe');
                 
                 if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
@@ -812,7 +875,10 @@
                         });
                     }
                 }
-            });
+                });
+            }
+            
+            console.log('✅ All action buttons setup complete');
             
             // Setup rating stars
             document.querySelectorAll('.star').forEach(star => {
