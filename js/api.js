@@ -17,7 +17,11 @@ class TriollAPI {
         const headers = {
             'Content-Type': 'application/json',
             'X-Platform': 'pc',
-            'X-App-Source': 'web'
+            'X-App-Source': 'web',
+            'X-Device-Type': Analytics ? Analytics.getDeviceType() : 'desktop',
+            'X-Browser': Analytics ? Analytics.getBrowser() : navigator.userAgent.substr(0, 50),
+            'X-OS': Analytics ? Analytics.getOS() : navigator.platform,
+            'X-Screen-Resolution': `${window.screen.width}x${window.screen.height}`
         };
 
         // Only add authorization if we have a valid token

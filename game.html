@@ -338,6 +338,20 @@
                 await API.trackPlay(gameId);
                 API.trackLocalActivity('play', gameId, { gameName: currentGame.name });
                 
+                // Track analytics with device information
+                Analytics.track('game_play', {
+                    gameId: gameId,
+                    gameName: currentGame.name,
+                    source: 'web',
+                    platform: 'pc',
+                    device: Analytics.getDeviceType(),
+                    referrer: document.referrer,
+                    directLink: !document.referrer.includes('trioll.com'),
+                    browser: Analytics.getBrowser(),
+                    os: Analytics.getOS(),
+                    screenResolution: `${window.screen.width}x${window.screen.height}`
+                });
+                
                 // Update play count
                 const currentPlays = parseInt(localStorage.getItem('trioll_games_played') || '0');
                 localStorage.setItem('trioll_games_played', (currentPlays + 1).toString());
@@ -420,8 +434,11 @@
                     
                     Analytics.track('game_like', {
                         gameId: currentGame.id,
+                        gameName: currentGame.name,
                         action: isLiked ? 'like' : 'unlike',
-                        source: 'web'
+                        source: 'web',
+                        platform: 'pc',
+                        device: Analytics.getDeviceType()
                     });
                 } catch (error) {
                     Logger.error('Failed to update like:', error);
@@ -434,25 +451,120 @@
             });
             
             // Share button
-            document.getElementById('shareBtn').addEventListener('click', () => {
+            document.getElementById('shareBtn').addEventListener('click', async () => {
                 const url = window.location.href;
                 if (navigator.share) {
-                    navigator.share({
-                        title: currentGame.name,
-                        text: `Check out ${currentGame.name} on Trioll!`,
-                        url: url
-                    });
+                    try {
+                        await navigator.share({
+                            title: currentGame.name,
+                            text: `Check out ${currentGame.name} on Trioll!`,
+                            url: url
+                        });
+                        
+                        Analytics.track('game_share', {
+                            gameId: currentGame.id,
+                            gameName: currentGame.name,
+                            method: 'native',
+                            source: 'web',
+                            platform: 'pc',
+                            device: Analytics.getDeviceType()
+                        });
+                    } catch (error) {
+                        // User cancelled share
+                        if (error.name !== 'AbortError') {
+                            Logger.error('Share failed:', error);
+                        }
+                    }
                 } else {
                     // Fallback - copy to clipboard
-                    navigator.clipboard.writeText(url);
-                    alert('Link copied to clipboard!');
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        alert('Link copied to clipboard!');
+                        
+                        Analytics.track('game_share', {
+                            gameId: currentGame.id,
+                            gameName: currentGame.name,
+                            method: 'clipboard',
+                            source: 'web',
+                            platform: 'pc',
+                            device: Analytics.getDeviceType()
+                        });
+                    } catch (error) {
+                        Logger.error('Copy to clipboard failed:', error);
+                        // Fallback fallback - select and copy
+                        const textArea = document.createElement('textarea');
+                        textArea.value = url;
+                        textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            alert('Link copied to clipboard!');
+                            
+                            Analytics.track('game_share', {
+                                gameId: currentGame.id,
+                                gameName: currentGame.name,
+                                method: 'fallback',
+                                source: 'web',
+                                platform: 'pc',
+                                device: Analytics.getDeviceType()
+                            });
+                        } catch (err) {
+                            alert('Failed to copy link');
+                        }
+                        document.body.removeChild(textArea);
+                    }
                 }
+            });
+            
+            // Fullscreen button
+            document.getElementById('fullscreenBtn').addEventListener('click', () => {
+                const iframe = document.getElementById('gameIframe');
                 
-                Analytics.track('game_share', {
-                    gameId: currentGame.id,
-                    method: navigator.share ? 'native' : 'clipboard',
-                    source: 'web'
-                });
+                if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+                    // Enter fullscreen
+                    const requestFullscreen = iframe.requestFullscreen || 
+                                            iframe.webkitRequestFullscreen || 
+                                            iframe.mozRequestFullScreen || 
+                                            iframe.msRequestFullscreen;
+                    
+                    if (requestFullscreen) {
+                        requestFullscreen.call(iframe).then(() => {
+                            Analytics.track('game_fullscreen_enter', {
+                                gameId: currentGame.id,
+                                gameName: currentGame.name,
+                                source: 'web',
+                                platform: 'pc',
+                                device: Analytics.getDeviceType()
+                            });
+                        }).catch(err => {
+                            Logger.error('Failed to enter fullscreen:', err);
+                            alert('Fullscreen not available');
+                        });
+                    }
+                } else {
+                    // Exit fullscreen
+                    const exitFullscreen = document.exitFullscreen || 
+                                         document.webkitExitFullscreen || 
+                                         document.mozCancelFullScreen || 
+                                         document.msExitFullscreen;
+                    
+                    if (exitFullscreen) {
+                        exitFullscreen.call(document).then(() => {
+                            Analytics.track('game_fullscreen_exit', {
+                                gameId: currentGame.id,
+                                gameName: currentGame.name,
+                                source: 'web',
+                                platform: 'pc',
+                                device: Analytics.getDeviceType()
+                            });
+                        }).catch(err => {
+                            Logger.error('Failed to exit fullscreen:', err);
+                        });
+                    }
+                }
             });
             
             // Setup rating stars
@@ -503,8 +615,11 @@
                 
                 Analytics.track('game_rate', {
                     gameId: currentGame.id,
+                    gameName: currentGame.name,
                     rating: currentRating,
-                    source: 'web'
+                    source: 'web',
+                    platform: 'pc',
+                    device: Analytics.getDeviceType()
                 });
                 
                 alert('Thanks for rating!');
@@ -534,8 +649,11 @@
                 
                 Analytics.track('purchase_intent', {
                     gameId: currentGame.id,
+                    gameName: currentGame.name,
                     intent: intent,
-                    source: 'web'
+                    source: 'web',
+                    platform: 'pc',
+                    device: Analytics.getDeviceType()
                 });
                 
                 if (intent === 'yes' && currentGame.purchaseUrl) {

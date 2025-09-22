@@ -1,128 +1,273 @@
-// CORS Headers Configuration
+// Analytics API Lambda Function
+// Tracks user events and game interactions
+
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = new DynamoDBClient({ region: 'us-east-1' });
+const dynamodb = DynamoDBDocumentClient.from(client);
+
+const ANALYTICS_TABLE = process.env.ANALYTICS_TABLE || 'trioll-prod-analytics';
+
 const CORS_HEADERS = {
-
-// Helper function to add CORS headers to response
-const addCorsHeaders = (response) => {
-    return {
-        ...response,
-        headers: {
-            ...response.headers,
-            ...CORS_HEADERS
-        }
-    };
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Identity-Id,X-Platform,X-App-Source,X-Guest-Mode,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Content-Type': 'application/json'
 };
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Guest-Mode,X-Identity-Id,X-Platform,X-App-Source',
-    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Content-Type': 'application/json'
-};
-
-// Minimal Analytics Lambda - No External Dependencies
-// This version works without requiring AWS SDK installation
 
 exports.handler = async (event) => {
-    console.log('Analytics event received:', JSON.stringify(event, null, 2));
+  console.log('Event:', JSON.stringify(event, null, 2));
+  
+  // Handle preflight
+  if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ''
+    };
+  }
+  
+  const response = {
+    statusCode: 200,
+    headers: CORS_HEADERS,
+    body: ''
+  };
+  
+  try {
+    const path = event.path || event.rawPath || '';
+    const body = JSON.parse(event.body || '{}');
     
-    try {
-        const body = JSON.parse(event.body || '{}');
-        const headers = event.headers || {};
-        
-        // Get platform details from headers
-        const platformDetails = getPlatformDetails(headers);
-        console.log('Platform details:', platformDetails);
-        
-        // Process events
-        const events = body.events || [body];
-        const processedCount = events.length;
-        
-        // For now, just log the events with platform info
-        events.forEach(evt => {
-            console.log('Processing event:', {
-                event: evt.event,
-                platform: platformDetails,
-                userId: evt.userId,
-                timestamp: new Date().toISOString()
-            });
-        });
-        
-        // Return success response
-        return {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                success: true,
-                eventsProcessed: processedCount,
-                platform: platformDetails,
-                message: `Processed ${processedCount} events for ${platformDetails.category}/${platformDetails.subcategory}`
-            })
-        };
-        
-    } catch (error) {
-        console.error('Error processing analytics:', error);
-        
-        return {
-            statusCode: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                success: false,
-                error: error.message
-            })
-        };
+    // Extract user ID from auth token or use guest ID
+    const userId = getUserIdFromEvent(event);
+    
+    if (path.includes('/analytics/events')) {
+      return handleTrackEvent(userId, body);
+    } else if (path.includes('/analytics/identify')) {
+      return handleIdentify(userId, body);
+    } else if (path.includes('/analytics/games')) {
+      return handleGameAnalytics(userId, body);
     }
+    
+    response.statusCode = 404;
+    response.body = JSON.stringify({ error: 'Not found' });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    response.statusCode = 500;
+    response.body = JSON.stringify({ error: 'Internal server error' });
+  }
+  
+  return response;
 };
 
-// Platform detection function
-function getPlatformDetails(headers) {
-    const source = headers['X-App-Source'] || headers['x-app-source'] || 'unknown';
-    const platform = headers['X-Platform'] || headers['x-platform'] || 'unknown';
-    const deviceType = headers['X-Device-Type'] || headers['x-device-type'] || 'unknown';
-    const browser = headers['X-Browser'] || headers['x-browser'] || null;
-    const os = headers['X-OS'] || headers['x-os'] || null;
-    const screenRes = headers['X-Screen-Resolution'] || headers['x-screen-resolution'] || null;
-    
-    // Enhanced categorization logic
-    let category, subcategory;
-    
-    if (source === 'web') {
-        if (platform === 'pc') {
-            // New PC platform format
-            category = 'pc';
-            subcategory = 'web';
-        } else if (platform === 'browser') {
-            // Legacy web format - treat as PC
-            category = 'pc';
-            subcategory = 'web-legacy';
-        } else {
-            // Unknown web platform
-            category = 'pc';
-            subcategory = 'web-unknown';
-        }
-    } else if (source === 'mobile') {
-        category = 'mobile';
-        subcategory = platform; // ios/android
-    } else if (source === 'developer') {
-        category = 'developer';
-        subcategory = 'portal';
-    } else {
-        // Unknown source
-        category = source;
-        subcategory = platform;
-    }
+function getUserIdFromEvent(event) {
+  // Try to get user ID from Cognito auth
+  const claims = event.requestContext?.authorizer?.jwt?.claims || 
+                 event.requestContext?.authorizer?.claims || {};
+  
+  if (claims.sub) {
+    return claims.sub;
+  }
+  
+  // Check for Cognito Identity ID (Amplify guest users)
+  if (event.requestContext?.identity?.cognitoIdentityId) {
+    return event.requestContext.identity.cognitoIdentityId;
+  }
+  
+  // Check for custom header
+  if (event.headers?.['X-Identity-Id'] || event.headers?.['x-identity-id']) {
+    return event.headers['X-Identity-Id'] || event.headers['x-identity-id'];
+  }
+  
+  // Generate guest ID from IP or use a default
+  const sourceIp = event.requestContext?.identity?.sourceIp || 
+                   event.requestContext?.http?.sourceIp || 
+                   'guest';
+  
+  return `guest-${sourceIp.replace(/\./g, '-')}`;
+}
+
+async function handleTrackEvent(userId, body) {
+  // Handle batch format from frontend
+  if (body.events && Array.isArray(body.events)) {
+    return handleBatchEvents(userId, body);
+  }
+  
+  // Handle single event format (backward compatibility)
+  const { eventType, data, timestamp } = body;
+  
+  if (!eventType) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'eventType is required' })
+    };
+  }
+  
+  const eventId = `${userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const event = {
+    eventId,
+    userId,
+    eventType,
+    timestamp: timestamp || new Date().toISOString(),
+    data: data || {},
+    ip: event.requestContext?.identity?.sourceIp,
+    userAgent: event.headers?.['User-Agent'] || event.headers?.['user-agent']
+  };
+  
+  try {
+    await dynamodb.send(new PutCommand({
+      TableName: ANALYTICS_TABLE,
+      Item: event
+    }));
     
     return {
-        category,
-        subcategory,
-        deviceInfo: {
-            type: deviceType,
-            os: os,
-            browser: browser,
-            screenResolution: screenRes
-        }
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ success: true, eventId })
     };
+  } catch (error) {
+    console.error('Error saving event:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to save event' })
+    };
+  }
+}
+
+async function handleBatchEvents(userId, body) {
+  const events = body.events;
+  const results = {
+    successful: 0,
+    failed: 0,
+    errors: []
+  };
+  
+  // Get platform info from headers
+  const platform = body.headers?.['X-Platform'] || body.headers?.['x-platform'] || 'unknown';
+  const appSource = body.headers?.['X-App-Source'] || body.headers?.['x-app-source'] || 'unknown';
+  
+  // Process each event
+  for (const event of events) {
+    try {
+      const eventId = `${userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      const eventItem = {
+        eventId,
+        userId,
+        eventType: event.type || event.event || event.eventType,
+        timestamp: event.timestamp || new Date().toISOString(),
+        data: {
+          ...event,
+          platform,
+          appSource
+        }
+      };
+      
+      // For web platform analytics
+      if (platform === 'pc' || appSource === 'web') {
+        eventItem.data.source = 'trioll-web';
+        console.log('Web event tracked:', eventItem.eventType);
+      }
+      
+      await dynamodb.send(new PutCommand({
+        TableName: ANALYTICS_TABLE,
+        Item: eventItem
+      }));
+      
+      results.successful++;
+    } catch (error) {
+      console.error('Error saving event:', error);
+      results.failed++;
+      results.errors.push(error.message);
+    }
+  }
+  
+  // Return 202 Accepted for batch processing
+  return {
+    statusCode: 202,
+    headers: CORS_HEADERS,
+    body: JSON.stringify({
+      success: results.successful > 0,
+      results
+    })
+  };
+}
+
+async function handleIdentify(userId, body) {
+  const { traits, timestamp } = body;
+  
+  const identifyEvent = {
+    eventId: `identify-${userId}-${Date.now()}`,
+    userId,
+    eventType: 'identify',
+    timestamp: timestamp || new Date().toISOString(),
+    data: traits || {}
+  };
+  
+  try {
+    await dynamodb.send(new PutCommand({
+      TableName: ANALYTICS_TABLE,
+      Item: identifyEvent
+    }));
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ success: true })
+    };
+  } catch (error) {
+    console.error('Error saving identify event:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to save identify event' })
+    };
+  }
+}
+
+async function handleGameAnalytics(userId, body) {
+  const { gameId, action, data, timestamp } = body;
+  
+  if (!gameId || !action) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'gameId and action are required' })
+    };
+  }
+  
+  const gameEvent = {
+    eventId: `game-${gameId}-${userId}-${Date.now()}`,
+    userId,
+    eventType: 'game_interaction',
+    timestamp: timestamp || new Date().toISOString(),
+    data: {
+      gameId,
+      action,
+      ...data
+    }
+  };
+  
+  try {
+    await dynamodb.send(new PutCommand({
+      TableName: ANALYTICS_TABLE,
+      Item: gameEvent
+    }));
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ success: true })
+    };
+  } catch (error) {
+    console.error('Error saving game event:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to save game event' })
+    };
+  }
 }
