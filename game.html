@@ -15,7 +15,7 @@
                 <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="40">
             </a>
             <div class="nav-right">
-                <a href="index.html" class="nav-link">Games</a>
+                <a href="games.html" class="nav-link">Games</a>
                 <a href="profile.html" class="nav-link">Profile</a>
                 <a href="inventory.html" class="nav-link">Inventory</a>
                 <a href="achievements.html" class="nav-link">Achievements</a>
@@ -246,7 +246,7 @@
             const gameId = urlParams.get('id');
             
             if (!gameId) {
-                window.location.href = 'index.html';
+                window.location.href = 'games.html';
                 return;
             }
             
@@ -547,16 +547,16 @@
                 } else if (intent !== 'askLater') {
                     // If they said no or yes without purchase URL, go back to games
                     setTimeout(() => {
-                        window.location.href = 'index.html';
+                        window.location.href = 'games.html';
                     }, 500);
                 } else {
                     // Ask later - just go back
-                    window.location.href = 'index.html';
+                    window.location.href = 'games.html';
                 }
             } catch (error) {
                 Logger.error('Failed to track purchase intent:', error);
                 // Still navigate back on error
-                window.location.href = 'index.html';
+                window.location.href = 'games.html';
             }
         }
         
@@ -578,7 +578,7 @@
                 showPurchaseModal();
             } else {
                 // Just go back if already shown or no game loaded
-                window.location.href = 'index.html';
+                window.location.href = 'games.html';
             }
         }
         
