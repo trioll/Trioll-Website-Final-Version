@@ -15,10 +15,9 @@ class TriollAPI {
     // Get headers for API calls
     async getHeaders() {
         const headers = {
-            'Content-Type': 'application/json'
-            // Temporarily commenting out custom headers until Lambda CORS is fixed
-            // 'X-Platform': 'pc',
-            // 'X-App-Source': 'web'
+            'Content-Type': 'application/json',
+            'X-Platform': 'pc',
+            'X-App-Source': 'web'
         };
 
         // Only add authorization if we have a valid token

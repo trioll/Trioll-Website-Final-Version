@@ -105,9 +105,8 @@ class AnalyticsService {
 
         try {
             const headers = {
-                'Content-Type': 'application/json'
-                // Temporarily commenting out custom headers until Lambda CORS is fixed
-                // 'X-App-Source': 'web'
+                'Content-Type': 'application/json',
+                'X-App-Source': 'web'
             };
 
             // Add auth headers if available
