@@ -414,10 +414,11 @@
         function setupActionButtons() {
             // Like button
             document.getElementById('likeBtn').addEventListener('click', async () => {
-                if (Auth.isGuest) {
-                    alert('Please login to like games');
-                    return;
-                }
+                // Allow guests to like on web platform
+                // if (Auth.isGuest) {
+                //     alert('Please login to like games');
+                //     return;
+                // }
                 
                 try {
                     if (isLiked) {
@@ -604,10 +605,11 @@
                 return;
             }
             
-            if (Auth.isGuest) {
-                alert('Please login to rate games');
-                return;
-            }
+            // Allow guests to rate on web platform
+            // if (Auth.isGuest) {
+            //     alert('Please login to rate games');
+            //     return;
+            // }
             
             try {
                 await API.rateGame(currentGame.id, currentRating);
