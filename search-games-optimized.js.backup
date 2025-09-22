@@ -1,0 +1,181 @@
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+
+// Initialize DynamoDB client with connection pooling
+const dynamoClient = new DynamoDBClient({
+    region: process.env.REGION || 'us-east-1',
+    maxAttempts: 3,
+    httpOptions: {
+        timeout: 5000,
+        connectTimeout: 3000
+    }
+});
+
+const docClient = DynamoDBDocumentClient.from(dynamoClient, {
+    marshallOptions: {
+        convertEmptyValues: false,
+        removeUndefinedValues: true
+    }
+});
+
+const GAMES_TABLE = process.env.GAMES_TABLE || 'trioll-prod-games';
+
+// In-memory cache for frequent searches
+const searchCache = new Map();
+const CACHE_TTL = 60000; // 1 minute
+const MAX_CACHE_SIZE = 100;
+
+// Keep Lambda warm
+let lastWarmup = Date.now();
+
+exports.handler = async (event) => {
+    console.log('Search request:', JSON.stringify(event.queryStringParameters));
+    
+    // Warmup check
+    if (event.source === 'aws.events' && event.detail?.type === 'Scheduled Event') {
+        lastWarmup = Date.now();
+        return { statusCode: 200, body: 'Warmed up' };
+    }
+    
+    const startTime = Date.now();
+    
+    try {
+        // Extract and validate search query
+        const searchQuery = event.queryStringParameters?.q?.toLowerCase().trim();
+        
+        if (!searchQuery || searchQuery.length < 2) {
+            return {
+                statusCode: 400,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'max-age=60'
+                },
+                body: JSON.stringify({
+                    error: 'Search query must be at least 2 characters'
+                })
+            };
+        }
+        
+        // Check cache first
+        const cacheKey = searchQuery;
+        const cachedResult = searchCache.get(cacheKey);
+        
+        if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_TTL)) {
+            console.log('Cache hit for:', searchQuery);
+            return {
+                statusCode: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'max-age=120',
+                    'X-Cache': 'HIT',
+                    'X-Response-Time': Date.now() - startTime
+                },
+                body: JSON.stringify({
+                    results: cachedResult.results,
+                    query: searchQuery,
+                    cached: true
+                })
+            };
+        }
+        
+        // Perform optimized search
+        console.log('Searching for:', searchQuery);
+        
+        // Try to use title index if available (future optimization)
+        // For now, use scan with limit and filter
+        const params = {
+            TableName: GAMES_TABLE,
+            Limit: 100, // Limit scan size for performance
+            FilterExpression: 'contains(#title, :query) OR contains(#desc, :query) OR contains(#cat, :query)',
+            ExpressionAttributeNames: {
+                '#title': 'title',
+                '#desc': 'description',
+                '#cat': 'category'
+            },
+            ExpressionAttributeValues: {
+                ':query': searchQuery
+            },
+            ProjectionExpression: 'id, gameId, title, description, category, image, rating, developer, playCount'
+        };
+        
+        const result = await docClient.send(new ScanCommand(params));
+        
+        // Process and score results
+        const scoredResults = (result.Items || [])
+            .map(game => {
+                let score = 0;
+                const title = (game.title || '').toLowerCase();
+                const description = (game.description || '').toLowerCase();
+                
+                // Scoring logic
+                if (title.startsWith(searchQuery)) score += 10;
+                else if (title.includes(searchQuery)) score += 5;
+                
+                if (description.includes(searchQuery)) score += 2;
+                
+                // Boost by rating
+                const rating = parseFloat(game.rating) || 0;
+                score += rating;
+                
+                return { ...game, searchScore: score };
+            })
+            .filter(game => game.searchScore > 0)
+            .sort((a, b) => b.searchScore - a.searchScore)
+            .slice(0, 20) // Return top 20 results
+            .map(({ searchScore, ...game }) => game); // Remove score from output
+        
+        // Update cache
+        if (searchCache.size >= MAX_CACHE_SIZE) {
+            // Remove oldest entry
+            const firstKey = searchCache.keys().next().value;
+            searchCache.delete(firstKey);
+        }
+        searchCache.set(cacheKey, {
+            results: scoredResults,
+            timestamp: Date.now()
+        });
+        
+        const response = {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'max-age=120',
+                'X-Cache': 'MISS',
+                'X-Response-Time': Date.now() - startTime
+            },
+            body: JSON.stringify({
+                results: scoredResults,
+                query: searchQuery,
+                count: scoredResults.length
+            })
+        };
+        
+        console.log(`Search completed in ${Date.now() - startTime}ms, found ${scoredResults.length} results`);
+        return response;
+        
+    } catch (error) {
+        console.error('Search error:', error);
+        
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                error: 'Search failed',
+                message: error.message
+            })
+        };
+    }
+};
+
+// Connection keep-alive
+setInterval(() => {
+    if (Date.now() - lastWarmup > 300000) { // 5 minutes
+        dynamoClient.destroy();
+    }
+}, 60000);

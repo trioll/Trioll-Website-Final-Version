@@ -1,17 +1,6 @@
 {
-  "name": "gsap-scrolltrigger-tube-demo",
+  "name": "trioll-prod-interactions-api",
   "version": "1.0.0",
-  "description": "GSAP ScrollTrigger Tube Demo with Three.js",
-  "main": "main.js",
-  "scripts": {
-    "start": "npx live-server --port=3000",
-    "dev": "npx live-server --port=3000"
-  },
-  "dependencies": {
-    "three": "^0.128.0",
-    "gsap": "^3.12.2"
-  },
-  "devDependencies": {
-    "live-server": "^1.2.2"
-  }
+  "description": "Lambda function",
+  "main": "index.js"
 }

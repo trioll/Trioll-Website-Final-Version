@@ -1,0 +1,137 @@
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = new DynamoDBClient({ region: process.env.REGION || 'us-east-1' });
+const dynamodb = DynamoDBDocumentClient.from(client);
+
+const GAMES_TABLE = process.env.GAMES_TABLE || 'trioll-prod-games';
+
+// Fixed CORS headers - allow all origins for development
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Guest-Mode,X-Identity-Id,X-Platform,X-App-Source',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Content-Type': 'application/json'
+};
+
+exports.handler = async (event) => {
+  console.log('Event:', JSON.stringify(event, null, 2));
+  
+  // Handle OPTIONS for CORS
+  if (event.httpMethod === 'OPTIONS' || event.requestContext?.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ''
+    };
+  }
+  
+  const path = event.path || event.rawPath || '';
+  const method = event.httpMethod || event.requestContext?.httpMethod || 'GET';
+  const pathParameters = event.pathParameters || {};
+  const queryParameters = event.queryStringParameters || {};
+  
+  try {
+    // Route: GET /games
+    if (path.includes('/games') && method === 'GET' && !pathParameters.gameId) {
+      const limit = parseInt(queryParameters.limit) || 20;
+      
+      // Scan for games (simple approach)
+      const params = {
+        TableName: GAMES_TABLE,
+        Limit: limit * 2 // Get extra to filter out v0 records
+      };
+      
+      const result = await dynamodb.send(new ScanCommand(params));
+      const items = result.Items || [];
+      
+      // Filter to only get game metadata (not v0 stats records)
+      const games = items
+        .filter(item => item.version === '1.0.0')
+        .map(game => ({
+          id: game.gameId,
+          gameId: game.gameId,
+          name: game.name || game.title || 'Untitled Game',
+          title: game.name || game.title || 'Untitled Game',
+          thumbnailUrl: game.thumbnailUrl || game.imageUrl || '',
+          gameUrl: game.gameUrl || '',
+          category: game.category || 'action',
+          developerName: game.developerName || 'Unknown',
+          uploadedAt: game.uploadedAt || game.createdAt,
+          // Default stats
+          playCount: 0,
+          likeCount: 0,
+          ratingCount: 0,
+          averageRating: 0
+        }))
+        .slice(0, limit);
+      
+      return {
+        statusCode: 200,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ games, success: true })
+      };
+    }
+    
+    // Route: GET /games/{gameId}
+    if (path.includes('/games/') && method === 'GET' && pathParameters.gameId) {
+      const gameId = pathParameters.gameId;
+      
+      const result = await dynamodb.send(new GetCommand({
+        TableName: GAMES_TABLE,
+        Key: {
+          gameId: gameId,
+          version: '1.0.0'
+        }
+      }));
+      
+      if (!result.Item) {
+        return {
+          statusCode: 404,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ error: 'Game not found' })
+        };
+      }
+      
+      const game = {
+        id: result.Item.gameId,
+        gameId: result.Item.gameId,
+        name: result.Item.name || result.Item.title || 'Untitled Game',
+        title: result.Item.name || result.Item.title || 'Untitled Game',
+        thumbnailUrl: result.Item.thumbnailUrl || result.Item.imageUrl || '',
+        gameUrl: result.Item.gameUrl || '',
+        category: result.Item.category || 'action',
+        developerName: result.Item.developerName || 'Unknown',
+        uploadedAt: result.Item.uploadedAt || result.Item.createdAt,
+        playCount: 0,
+        likeCount: 0,
+        ratingCount: 0,
+        averageRating: 0
+      };
+      
+      return {
+        statusCode: 200,
+        headers: CORS_HEADERS,
+        body: JSON.stringify(game)
+      };
+    }
+    
+    // Default: route not found
+    return {
+      statusCode: 404,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Route not found', path, method })
+    };
+    
+  } catch (error) {
+    console.error('Handler error:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message 
+      })
+    };
+  }
+};

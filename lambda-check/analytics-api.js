@@ -1,0 +1,128 @@
+// CORS Headers Configuration
+const CORS_HEADERS = {
+
+// Helper function to add CORS headers to response
+const addCorsHeaders = (response) => {
+    return {
+        ...response,
+        headers: {
+            ...response.headers,
+            ...CORS_HEADERS
+        }
+    };
+};
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Guest-Mode,X-Identity-Id,X-Platform,X-App-Source',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Content-Type': 'application/json'
+};
+
+// Minimal Analytics Lambda - No External Dependencies
+// This version works without requiring AWS SDK installation
+
+exports.handler = async (event) => {
+    console.log('Analytics event received:', JSON.stringify(event, null, 2));
+    
+    try {
+        const body = JSON.parse(event.body || '{}');
+        const headers = event.headers || {};
+        
+        // Get platform details from headers
+        const platformDetails = getPlatformDetails(headers);
+        console.log('Platform details:', platformDetails);
+        
+        // Process events
+        const events = body.events || [body];
+        const processedCount = events.length;
+        
+        // For now, just log the events with platform info
+        events.forEach(evt => {
+            console.log('Processing event:', {
+                event: evt.event,
+                platform: platformDetails,
+                userId: evt.userId,
+                timestamp: new Date().toISOString()
+            });
+        });
+        
+        // Return success response
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                success: true,
+                eventsProcessed: processedCount,
+                platform: platformDetails,
+                message: `Processed ${processedCount} events for ${platformDetails.category}/${platformDetails.subcategory}`
+            })
+        };
+        
+    } catch (error) {
+        console.error('Error processing analytics:', error);
+        
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                success: false,
+                error: error.message
+            })
+        };
+    }
+};
+
+// Platform detection function
+function getPlatformDetails(headers) {
+    const source = headers['X-App-Source'] || headers['x-app-source'] || 'unknown';
+    const platform = headers['X-Platform'] || headers['x-platform'] || 'unknown';
+    const deviceType = headers['X-Device-Type'] || headers['x-device-type'] || 'unknown';
+    const browser = headers['X-Browser'] || headers['x-browser'] || null;
+    const os = headers['X-OS'] || headers['x-os'] || null;
+    const screenRes = headers['X-Screen-Resolution'] || headers['x-screen-resolution'] || null;
+    
+    // Enhanced categorization logic
+    let category, subcategory;
+    
+    if (source === 'web') {
+        if (platform === 'pc') {
+            // New PC platform format
+            category = 'pc';
+            subcategory = 'web';
+        } else if (platform === 'browser') {
+            // Legacy web format - treat as PC
+            category = 'pc';
+            subcategory = 'web-legacy';
+        } else {
+            // Unknown web platform
+            category = 'pc';
+            subcategory = 'web-unknown';
+        }
+    } else if (source === 'mobile') {
+        category = 'mobile';
+        subcategory = platform; // ios/android
+    } else if (source === 'developer') {
+        category = 'developer';
+        subcategory = 'portal';
+    } else {
+        // Unknown source
+        category = source;
+        subcategory = platform;
+    }
+    
+    return {
+        category,
+        subcategory,
+        deviceInfo: {
+            type: deviceType,
+            os: os,
+            browser: browser,
+            screenResolution: screenRes
+        }
+    };
+}

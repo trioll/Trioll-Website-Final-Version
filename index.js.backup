@@ -1,0 +1,932 @@
+// Production User Interactions API Lambda Function with Comments Support
+// Uses AWS SDK v3 with CommonJS syntax for Lambda Node.js 20.x runtime
+
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+
+// Initialize DynamoDB client
+const client = new DynamoDBClient({ region: 'us-east-1' });
+const dynamodb = DynamoDBDocumentClient.from(client);
+
+// Table names from environment or defaults
+const GAMES_TABLE = process.env.GAMES_TABLE || 'trioll-prod-games';
+const LIKES_TABLE = process.env.LIKES_TABLE || 'trioll-prod-likes';
+const RATINGS_TABLE = process.env.RATINGS_TABLE || 'trioll-prod-ratings';
+const PLAYCOUNTS_TABLE = process.env.PLAYCOUNTS_TABLE || 'trioll-prod-playcounts';
+const COMMENTS_TABLE = process.env.COMMENTS_TABLE || 'trioll-prod-comments';
+const PURCHASE_INTENT_TABLE = process.env.PURCHASE_INTENT_TABLE || 'trioll-prod-purchase-intent';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Guest-Mode,X-Identity-Id',
+  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
+};
+
+exports.handler = async (event) => {
+  console.log('Event:', JSON.stringify(event, null, 2));
+  
+  // Handle preflight
+  if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ''
+    };
+  }
+  
+  try {
+    const path = event.path || event.rawPath || '';
+    const method = event.httpMethod || event.requestContext?.http?.method || '';
+    const pathParameters = event.pathParameters || {};
+    const gameId = pathParameters.gameId || pathParameters.id;
+    
+    // Extract user ID
+    const userId = getUserIdFromEvent(event);
+    
+    if (!gameId) {
+      return {
+        statusCode: 400,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ error: 'Game ID required' })
+      };
+    }
+    
+    // Route handling
+    if (path.includes('/likes')) {
+      if (method === 'POST') {
+        return await handleLikeGame(gameId, userId);
+      } else if (method === 'DELETE') {
+        return await handleUnlikeGame(gameId, userId);
+      }
+    } else if (path.includes('/plays')) {
+      return await handlePlayGame(gameId, userId);
+    } else if (path.includes('/ratings')) {
+      const body = JSON.parse(event.body || '{}');
+      return await handleRateGame(gameId, userId, body.rating);
+    } else if (path.includes('/bookmarks')) {
+      if (method === 'POST') {
+        return await handleBookmarkGame(gameId, userId);
+      } else if (method === 'DELETE') {
+        return await handleUnbookmarkGame(gameId, userId);
+      }
+    } else if (path.includes('/comments')) {
+      if (method === 'GET') {
+        return await handleGetComments(gameId);
+      } else if (method === 'POST') {
+        const body = JSON.parse(event.body || '{}');
+        // Support both 'comment' and 'commentText' field names
+        const commentText = body.comment || body.commentText;
+        return await handleAddComment(gameId, userId, commentText);
+      } else if (method === 'DELETE') {
+        const commentId = pathParameters.commentId;
+        return await handleDeleteComment(gameId, userId, commentId);
+      }
+    } else if (path.includes('/purchase-intent')) {
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ error: 'Request body is required' })
+        };
+      }
+      
+      let body;
+      try {
+        body = JSON.parse(event.body);
+      } catch (e) {
+        console.error('Failed to parse body:', event.body);
+        return {
+          statusCode: 400,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ error: 'Invalid JSON in request body' })
+        };
+      }
+      
+      return await handlePurchaseIntent(gameId, userId, body);
+    }
+    
+    return {
+      statusCode: 404,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Not found' })
+    };
+    
+  } catch (error) {
+    console.error('Handler error:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message 
+      })
+    };
+  }
+};
+
+function getUserIdFromEvent(event) {
+  // Check for guest mode headers
+  const headers = event.headers || {};
+  if (headers['X-Guest-Mode'] === 'true' && headers['X-Identity-Id']) {
+    return `guest-${headers['X-Identity-Id']}`;
+  }
+  
+  // Try to get from body
+  try {
+    const body = JSON.parse(event.body || '{}');
+    if (body.userId) return body.userId;
+  } catch (e) {}
+  
+  // Generate random guest ID
+  return `guest-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// COMMENTS HANDLERS
+async function handleGetComments(gameId) {
+  try {
+    const response = await dynamodb.send(new QueryCommand({
+      TableName: COMMENTS_TABLE,
+      KeyConditionExpression: 'gameId = :gameId',
+      ExpressionAttributeValues: {
+        ':gameId': gameId
+      },
+      ScanIndexForward: false, // Most recent first
+      Limit: 50 // Limit to 50 comments
+    }));
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({
+        gameId,
+        comments: response.Items || [],
+        count: response.Count || 0
+      })
+    };
+  } catch (error) {
+    console.error('Error getting comments:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to get comments' })
+    };
+  }
+}
+
+async function handleAddComment(gameId, userId, comment) {
+  if (!comment || comment.trim().length === 0) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Comment text required' })
+    };
+  }
+  
+  if (comment.length > 500) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Comment too long (max 500 characters)' })
+    };
+  }
+  
+  try {
+    const timestamp = new Date().toISOString();
+    const commentId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Save comment
+    await dynamodb.send(new PutCommand({
+      TableName: COMMENTS_TABLE,
+      Item: {
+        gameId,
+        commentId,
+        userId,
+        commentText: comment.trim(),
+        timestamp,
+        likes: 0,
+        edited: false,
+        ttl: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60) // 90 days
+      }
+    }));
+    
+    // Update game comment count
+    await updateGameCommentCount(gameId, 1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({
+        gameId,
+        commentId,
+        userId,
+        commentText: comment.trim(),
+        timestamp,
+        likes: 0
+      })
+    };
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to add comment' })
+    };
+  }
+}
+
+async function handleDeleteComment(gameId, userId, commentId) {
+  if (!commentId) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Comment ID required' })
+    };
+  }
+  
+  try {
+    // First check if the comment belongs to the user
+    const getResponse = await dynamodb.send(new GetCommand({
+      TableName: COMMENTS_TABLE,
+      Key: { gameId, commentId }
+    }));
+    
+    if (!getResponse.Item) {
+      return {
+        statusCode: 404,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ error: 'Comment not found' })
+      };
+    }
+    
+    if (getResponse.Item.userId !== userId) {
+      return {
+        statusCode: 403,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ error: 'Not authorized to delete this comment' })
+      };
+    }
+    
+    // Delete the comment
+    await dynamodb.send(new DeleteCommand({
+      TableName: COMMENTS_TABLE,
+      Key: { gameId, commentId }
+    }));
+    
+    // Update game comment count
+    await updateGameCommentCount(gameId, -1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({
+        success: true,
+        gameId,
+        commentId
+      })
+    };
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to delete comment' })
+    };
+  }
+}
+
+async function updateGameCommentCount(gameId, increment) {
+  try {
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },
+      UpdateExpression: 'ADD commentCount :inc',
+      ExpressionAttributeValues: { ':inc': increment },
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || { commentCount: 0 };
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: {
+          gameId: gameId,
+          version: 'v0',
+          likeCount: 0,
+          playCount: 0,
+          ratingCount: 0,
+          totalRating: 0,
+          commentCount: Math.max(0, increment),
+          createdAt: new Date().toISOString()
+        }
+      }));
+      return { commentCount: Math.max(0, increment) };
+    }
+    throw error;
+  }
+}
+
+// EXISTING HANDLERS (unchanged)
+async function handleLikeGame(gameId, userId) {
+  try {
+    console.log('Handling like for game:', gameId, 'user:', userId);
+    
+    // Check if already liked
+    let existingLike = null;
+    try {
+      const response = await dynamodb.send(new GetCommand({
+        TableName: LIKES_TABLE,
+        Key: { gameId, userId }  // gameId is partition key, userId is sort key
+      }));
+      existingLike = response.Item;
+    } catch (err) {
+      // Item doesn't exist
+    }
+    
+    if (existingLike) {
+      // Already liked, get current count
+      const game = await getGameStats(gameId);
+      return {
+        statusCode: 200,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ 
+          gameId, 
+          likeCount: game.likeCount || 0,
+          userLiked: true,
+          timestamp: new Date().toISOString()
+        })
+      };
+    }
+    
+    // Add like
+    await dynamodb.send(new PutCommand({
+      TableName: LIKES_TABLE,
+      Item: {
+        gameId,  // partition key first
+        userId,  // sort key second
+        timestamp: new Date().toISOString(),
+        ttl: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60) // 90 days
+      }
+    }));
+    
+    // Update game stats
+    const updateResult = await updateGameLikeCount(gameId, 1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        gameId, 
+        likeCount: updateResult.likeCount,
+        userLiked: true,
+        timestamp: new Date().toISOString()
+      })
+    };
+  } catch (error) {
+    console.error('Error liking game:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to like game' })
+    };
+  }
+}
+
+async function handleUnlikeGame(gameId, userId) {
+  try {
+    // Remove like
+    await dynamodb.send(new DeleteCommand({
+      TableName: LIKES_TABLE,
+      Key: { gameId, userId }  // gameId is partition key, userId is sort key
+    }));
+    
+    // Update game stats
+    await updateGameLikeCount(gameId, -1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        success: true, 
+        gameId, 
+        userId 
+      })
+    };
+  } catch (error) {
+    console.error('Error unliking game:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to unlike game' })
+    };
+  }
+}
+
+async function handlePlayGame(gameId, userId) {
+  try {
+    const now = new Date();
+    const timestamp = now.toISOString();
+    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Record play
+    await dynamodb.send(new PutCommand({
+      TableName: PLAYCOUNTS_TABLE,
+      Item: {
+        gameId,  // partition key
+        date,    // sort key
+        userId,
+        playCount: 1,
+        sessionId: `session-${Date.now()}`,
+        timestamp,
+        ttl: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60) // 90 days
+      }
+    }));
+    
+    // Update game stats
+    const updateResult = await updateGamePlayCount(gameId, 1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        gameId,
+        playCount: updateResult.playCount,
+        timestamp
+      })
+    };
+  } catch (error) {
+    console.error('Error recording play:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to record play' })
+    };
+  }
+}
+
+async function handleRateGame(gameId, userId, rating) {
+  if (!rating || rating < 1 || rating > 5) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Invalid rating. Must be between 1 and 5.' })
+    };
+  }
+  
+  try {
+    // Check existing rating
+    let existingRating = null;
+    try {
+      const response = await dynamodb.send(new GetCommand({
+        TableName: RATINGS_TABLE,
+        Key: { gameId, userId }  // gameId is partition key, userId is sort key
+      }));
+      existingRating = response.Item;
+    } catch (err) {
+      // Item doesn't exist
+    }
+    
+    const oldRating = existingRating?.rating || 0;
+    const isNewRating = !existingRating;
+    
+    // Save rating
+    await dynamodb.send(new PutCommand({
+      TableName: RATINGS_TABLE,
+      Item: {
+        gameId,  // partition key first
+        userId,  // sort key second
+        rating,
+        timestamp: new Date().toISOString(),
+        ttl: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60) // 90 days
+      }
+    }));
+    
+    // Update game stats
+    const stats = await updateGameRating(gameId, rating, oldRating, isNewRating);
+    const averageRating = stats.ratingCount > 0 ? stats.totalRating / stats.ratingCount : 0;
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        gameId,
+        rating,
+        totalRatings: stats.ratingCount,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        timestamp: new Date().toISOString()
+      })
+    };
+  } catch (error) {
+    console.error('Error rating game:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to rate game' })
+    };
+  }
+}
+
+async function handleBookmarkGame(gameId, userId) {
+  try {
+    await dynamodb.send(new PutCommand({
+      TableName: LIKES_TABLE,
+      Item: {
+        gameId,  // partition key first
+        userId: `bookmark_${userId}`,  // sort key second - cleaner prefix
+        timestamp: new Date().toISOString(),
+        type: 'bookmark',
+        ttl: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60) // 90 days
+      }
+    }));
+    
+    // Update bookmark count in games table
+    const updateResult = await updateGameBookmarkCount(gameId, 1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        success: true, 
+        gameId, 
+        userId,
+        bookmarked: true,
+        bookmarkCount: updateResult.bookmarkCount || 0,
+        timestamp: new Date().toISOString()
+      })
+    };
+  } catch (error) {
+    console.error('Error bookmarking:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to bookmark' })
+    };
+  }
+}
+
+async function handleUnbookmarkGame(gameId, userId) {
+  try {
+    await dynamodb.send(new DeleteCommand({
+      TableName: LIKES_TABLE,
+      Key: { 
+        gameId,  // partition key first
+        userId: `bookmark_${userId}`  // sort key second - match the new prefix
+      }
+    }));
+    
+    // Update bookmark count in games table
+    const updateResult = await updateGameBookmarkCount(gameId, -1);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ 
+        success: true, 
+        gameId, 
+        userId,
+        bookmarked: false,
+        bookmarkCount: updateResult.bookmarkCount || 0
+      })
+    };
+  } catch (error) {
+    console.error('Error unbookmarking:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to unbookmark' })
+    };
+  }
+}
+
+// Helper functions
+async function getGameStats(gameId) {
+  try {
+    const response = await dynamodb.send(new GetCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' }  // gameId is partition key, version is sort key
+    }));
+    
+    return response.Item || {
+      gameId: gameId,
+      likeCount: 0,
+      playCount: 0,
+      ratingCount: 0,
+      totalRating: 0,
+      commentCount: 0,
+      bookmarkCount: 0
+    };
+  } catch (error) {
+    console.error('Error getting game stats:', error);
+    return {
+      gameId: gameId,
+      likeCount: 0,
+      playCount: 0,
+      ratingCount: 0,
+      totalRating: 0,
+      commentCount: 0
+    };
+  }
+}
+
+async function updateGameLikeCount(gameId, increment) {
+  try {
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },  // gameId is partition key, version is sort key
+      UpdateExpression: 'ADD likeCount :inc',
+      ExpressionAttributeValues: { ':inc': increment },
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || { likeCount: 0 };
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: {
+          gameId: gameId,
+          version: 'v0',
+          likeCount: Math.max(0, increment),
+          playCount: 0,
+          ratingCount: 0,
+          totalRating: 0,
+          commentCount: 0,
+          createdAt: new Date().toISOString()
+        }
+      }));
+      return { likeCount: Math.max(0, increment) };
+    }
+    throw error;
+  }
+}
+
+async function updateGamePlayCount(gameId, increment) {
+  try {
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },  // gameId is partition key, version is sort key
+      UpdateExpression: 'ADD playCount :inc',
+      ExpressionAttributeValues: { ':inc': increment },
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || { playCount: 0 };
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: {
+          gameId: gameId,
+          version: 'v0',
+          likeCount: 0,
+          playCount: increment,
+          ratingCount: 0,
+          totalRating: 0,
+          commentCount: 0,
+          createdAt: new Date().toISOString()
+        }
+      }));
+      return { playCount: increment };
+    }
+    throw error;
+  }
+}
+
+async function updateGameRating(gameId, rating, oldRating, isNewRating) {
+  try {
+    let updateExpression = 'ADD totalRating :ratingDiff';
+    const expressionValues = {
+      ':ratingDiff': rating - oldRating
+    };
+    
+    if (isNewRating) {
+      updateExpression += ', ratingCount :inc';
+      expressionValues[':inc'] = 1;
+    }
+    
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },  // gameId is partition key, version is sort key
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || { ratingCount: 1, totalRating: rating };
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: {
+          gameId: gameId,
+          version: 'v0',
+          likeCount: 0,
+          playCount: 0,
+          ratingCount: 1,
+          totalRating: rating,
+          commentCount: 0,
+          bookmarkCount: 0,  // Initialize bookmark count
+          createdAt: new Date().toISOString()
+        }
+      }));
+      return { ratingCount: 1, totalRating: rating };
+    }
+    throw error;
+  }
+}
+
+// Get bookmark status
+async function handleGetBookmarkStatus(gameId, userId) {
+  try {
+    const response = await dynamodb.send(new GetCommand({
+      TableName: LIKES_TABLE,
+      Key: { gameId, userId: `bookmark_${userId}` }
+    }));
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({
+        gameId,
+        userId,
+        bookmarked: !!response.Item,
+        timestamp: response.Item?.timestamp || null
+      })
+    };
+  } catch (error) {
+    console.error('Error checking bookmark status:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to check bookmark status' })
+    };
+  }
+}
+
+// New function to update bookmark count
+async function updateGameBookmarkCount(gameId, increment) {
+  try {
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },
+      UpdateExpression: 'ADD bookmarkCount :inc',
+      ExpressionAttributeValues: { ':inc': increment },
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || { bookmarkCount: 0 };
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: {
+          gameId: gameId,
+          version: 'v0',
+          likeCount: 0,
+          playCount: 0,
+          ratingCount: 0,
+          totalRating: 0,
+          commentCount: 0,
+          bookmarkCount: Math.max(0, increment),
+          createdAt: new Date().toISOString()
+        }
+      }));
+      return { bookmarkCount: Math.max(0, increment) };
+    }
+    throw error;
+  }
+}
+
+// PURCHASE INTENT HANDLERS
+async function handlePurchaseIntent(gameId, userId, data) {
+  console.log('Purchase Intent Request:', { gameId, userId, data });
+  
+  const { response, sessionId } = data;
+  
+  // Validate response
+  if (!response || !['yes', 'no', 'ask-later'].includes(response)) {
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Invalid intent value' })
+    };
+  }
+  
+  try {
+    const timestamp = new Date().toISOString();
+    const recordId = `${userId}_${Date.now()}`;
+    
+    // Store purchase intent
+    await dynamodb.send(new PutCommand({
+      TableName: PURCHASE_INTENT_TABLE,
+      Item: {
+        gameId,
+        userIdTimestamp: recordId,
+        userId,
+        response,
+        sessionId: sessionId || `session-${Date.now()}`,
+        timestamp,
+        date: timestamp.split('T')[0], // YYYY-MM-DD for potential date-based queries
+        ttl: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60) // 1 year retention
+      }
+    }));
+    
+    // Update game stats
+    await updateGamePurchaseIntent(gameId, response);
+    
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({
+        success: true,
+        gameId,
+        userId,
+        response,
+        timestamp
+      })
+    };
+  } catch (error) {
+    console.error('Error recording purchase intent:', error);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ error: 'Failed to record purchase intent' })
+    };
+  }
+}
+
+// Update game purchase intent stats
+async function updateGamePurchaseIntent(gameId, intentResponse) {
+  try {
+    let updateExpression = 'ADD ';
+    const expressionValues = {};
+    
+    switch (intentResponse) {
+      case 'yes':
+        updateExpression += 'purchaseIntentYes :inc';
+        expressionValues[':inc'] = 1;
+        break;
+      case 'no':
+        updateExpression += 'purchaseIntentNo :inc';
+        expressionValues[':inc'] = 1;
+        break;
+      case 'ask-later':
+        updateExpression += 'purchaseIntentAskLater :inc';
+        expressionValues[':inc'] = 1;
+        break;
+    }
+    
+    const response = await dynamodb.send(new UpdateCommand({
+      TableName: GAMES_TABLE,
+      Key: { gameId: gameId, version: 'v0' },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response.Attributes || {};
+  } catch (error) {
+    if (error.name === 'ValidationException' || error.name === 'ResourceNotFoundException') {
+      // Game doesn't exist, create it
+      const item = {
+        gameId: gameId,
+        version: 'v0',
+        likeCount: 0,
+        playCount: 0,
+        ratingCount: 0,
+        totalRating: 0,
+        commentCount: 0,
+        bookmarkCount: 0,
+        purchaseIntentYes: 0,
+        purchaseIntentNo: 0,
+        purchaseIntentAskLater: 0,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Set the initial value
+      switch (intentResponse) {
+        case 'yes':
+          item.purchaseIntentYes = 1;
+          break;
+        case 'no':
+          item.purchaseIntentNo = 1;
+          break;
+        case 'ask-later':
+          item.purchaseIntentAskLater = 1;
+          break;
+      }
+      
+      await dynamodb.send(new PutCommand({
+        TableName: GAMES_TABLE,
+        Item: item
+      }));
+      return item;
+    }
+    throw error;
+  }
+}
