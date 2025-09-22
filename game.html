@@ -108,21 +108,48 @@
         /* Fix for game action buttons */
         .game-actions {
             position: relative !important;
-            z-index: 10;
+            z-index: 100 !important;
             pointer-events: auto !important;
+            display: flex !important;
+            justify-content: center !important;
+            gap: 16px !important;
+            padding: 16px !important;
+            background: rgba(26, 26, 26, 0.9) !important;
         }
         
         .game-actions .action-btn {
             cursor: pointer !important;
             pointer-events: auto !important;
-            position: relative;
-            z-index: 11;
+            position: relative !important;
+            z-index: 101 !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+            padding: 8px 16px !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            transition: all 0.2s !important;
+            font-size: 14px !important;
+            min-width: 80px !important;
+            justify-content: center !important;
+        }
+        
+        .game-actions .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2) !important;
+            transform: translateY(-2px) !important;
         }
         
         /* Ensure game container doesn't overlap buttons */
         #gameContainer {
             position: relative;
             z-index: 1;
+        }
+        
+        /* Ensure iframe doesn't block interactions */
+        #gameIframe {
+            pointer-events: auto;
         }
         
         /* Debug - add visual feedback */
@@ -367,6 +394,7 @@
                     gameWrapper.classList.remove('hidden');
                     gameWrapper.innerHTML = `
                         <iframe 
+                            id="gameIframe"
                             src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
                             style="width: 100%; height: 100%; border: none;"
                             allowfullscreen
@@ -405,6 +433,24 @@
         let comments = [];
         let commentsPage = 1;
         let hasMoreComments = true;
+        
+        // Debug function to test button functionality
+        window.testButtons = function() {
+            console.log('🔍 Testing button functionality...');
+            console.log('Current game:', window.currentGame);
+            console.log('Auth status:', { 
+                isAuthenticated: Auth?.isAuthenticated(), 
+                isGuest: Auth?.isGuest,
+                guestId: Auth?.getGuestId()
+            });
+            console.log('API available:', typeof API !== 'undefined');
+            console.log('Analytics available:', typeof Analytics !== 'undefined');
+            
+            // Try to manually trigger a like
+            if (window.currentGame) {
+                console.log('Attempting manual like for game:', window.currentGame.id);
+            }
+        };
         
         // Function to sync local likes to backend
         async function syncLocalLikes() {
@@ -548,6 +594,7 @@
                     Logger.log('🎮 Creating iframe with URL:', gameUrl);
                     
                     const iframe = document.createElement('iframe');
+                    iframe.id = 'gameIframe'; // Add ID for button interactions
                     iframe.src = gameUrl;
                     iframe.style.width = '100%';
                     iframe.style.height = '100%';
