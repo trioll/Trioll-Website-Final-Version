@@ -9,9 +9,18 @@ class GoogleAuthService {
     async initialize() {
         if (this.initialized) return;
 
+        console.log('Starting Google Sign-In initialization...');
+        console.log('Client ID:', this.clientId);
+
         try {
             // Load Google Sign-In API
             await this.loadGoogleScript();
+            console.log('Google script loaded');
+            
+            // Check if google object exists
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+                throw new Error('Google Sign-In API not loaded properly');
+            }
             
             // Initialize Google Sign-In
             google.accounts.id.initialize({
@@ -22,13 +31,16 @@ class GoogleAuthService {
             });
             
             this.initialized = true;
+            console.log('Google Sign-In initialized successfully');
             Logger.log('✅ Google Sign-In initialized');
             
             // Dispatch custom event when initialized
             window.dispatchEvent(new CustomEvent('google-signin-ready'));
             
         } catch (error) {
+            console.error('Failed to initialize Google Sign-In:', error);
             Logger.error('Failed to initialize Google Sign-In:', error);
+            this.initialized = false;
             throw error;
         }
     }
@@ -53,8 +65,17 @@ class GoogleAuthService {
 
     // Render Google Sign-In button
     renderButton(elementId, options = {}) {
+        console.log(`Rendering Google button for element: ${elementId}`);
+        
         if (!this.initialized) {
+            console.error('Google Sign-In not initialized');
             Logger.error('Google Sign-In not initialized');
+            return;
+        }
+
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element ${elementId} not found`);
             return;
         }
 
@@ -67,10 +88,16 @@ class GoogleAuthService {
             width: 250
         };
 
-        google.accounts.id.renderButton(
-            document.getElementById(elementId),
-            { ...defaultOptions, ...options }
-        );
+        const finalOptions = { ...defaultOptions, ...options };
+        console.log('Rendering with options:', finalOptions);
+
+        try {
+            google.accounts.id.renderButton(element, finalOptions);
+            console.log(`Button rendered successfully for ${elementId}`);
+        } catch (error) {
+            console.error(`Failed to render button for ${elementId}:`, error);
+            element.innerHTML = '<div style="color: red;">Failed to load Google Sign-In</div>';
+        }
     }
 
     // Handle credential response from Google
@@ -296,11 +323,19 @@ const GoogleAuth = new GoogleAuthService();
 
 // Initialize when ready
 document.addEventListener('DOMContentLoaded', async () => {
-    if (Config.GOOGLE_CLIENT_ID) {
+    console.log('DOMContentLoaded - checking Google Sign-In...');
+    console.log('Config loaded?', typeof Config !== 'undefined');
+    console.log('Google Client ID:', Config?.GOOGLE_CLIENT_ID);
+    
+    if (Config && Config.GOOGLE_CLIENT_ID) {
         try {
             await GoogleAuth.initialize();
         } catch (error) {
+            console.error('Google Sign-In initialization failed:', error);
             Logger.warn('Google Sign-In initialization failed:', error);
         }
+    } else {
+        console.warn('Google Client ID not found in Config');
+        Logger.warn('Google Client ID not found in Config');
     }
 });
