@@ -437,6 +437,9 @@ window.addEventListener('load', () => {
 });
 
 // Also try when Config is loaded (in case it loads late)
-if (typeof Config !== 'undefined' && Config.GOOGLE_CLIENT_ID && !GoogleAuth.initialized) {
-    initializeGoogleAuth();
-}
+setTimeout(() => {
+    if (typeof Config !== 'undefined' && Config.GOOGLE_CLIENT_ID && !GoogleAuth.initialized) {
+        console.log('Late initialization attempt for Google Auth');
+        initializeGoogleAuth();
+    }
+}, 2000);
