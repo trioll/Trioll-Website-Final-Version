@@ -130,6 +130,62 @@
             transform: scale(0.95) !important;
             background: rgba(255, 255, 255, 0.3) !important;
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: block;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal.hidden {
+            display: none;
+        }
+        
+        .modal-content {
+            background-color: #1a1a1a;
+            margin: 15% auto;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 90%;
+            max-width: 400px;
+            border-radius: 16px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: #fff;
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #fff;
+        }
+        
+        #submitRating {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -624,10 +680,21 @@
             likeBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                
+                // Re-check currentGame from window
+                currentGame = window.currentGame;
+                
                 Logger.log('Like button clicked! Current state:', { isLiked, likeCount: currentGame?.likeCount });
-                console.log('❤️ LIKE BUTTON CLICKED!', { isLiked, gameId: currentGame?.id, event: e });
+                console.log('❤️ LIKE BUTTON CLICKED!', { 
+                    isLiked, 
+                    gameId: currentGame?.id, 
+                    currentGame, 
+                    windowCurrentGame: window.currentGame,
+                    event: e 
+                });
                 
                 if (!currentGame || !currentGame.id) {
+                    console.error('❌ Game not loaded:', { currentGame, window: window.currentGame });
                     alert('Game not loaded yet. Please wait a moment and try again.');
                     return;
                 }
@@ -708,6 +775,17 @@
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('⭐ RATE BUTTON CLICKED!');
+                    
+                    // Re-check currentGame from window
+                    currentGame = window.currentGame;
+                    
+                    if (!currentGame || !currentGame.id) {
+                        console.error('❌ Game not loaded for rating:', { currentGame, window: window.currentGame });
+                        alert('Game not loaded yet. Please wait a moment and try again.');
+                        return;
+                    }
+                    
+                    console.log('📊 Opening rating modal for game:', currentGame);
                     document.getElementById('ratingModal').classList.remove('hidden');
                 });
             }
@@ -721,6 +799,16 @@
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('🔗 SHARE BUTTON CLICKED!');
+                    
+                    // Re-check currentGame from window
+                    currentGame = window.currentGame;
+                    
+                    if (!currentGame || !currentGame.id) {
+                        console.error('❌ Game not loaded for sharing:', { currentGame, window: window.currentGame });
+                        alert('Game not loaded yet. Please wait a moment and try again.');
+                        return;
+                    }
+                    
                 const url = window.location.href;
                 if (navigator.share) {
                     try {
@@ -819,6 +907,14 @@
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('⛶ FULLSCREEN BUTTON CLICKED!');
+                    
+                    // Re-check currentGame from window
+                    currentGame = window.currentGame;
+                    
+                    if (!currentGame) {
+                        console.warn('⚠️ Game not loaded but allowing fullscreen anyway');
+                    }
+                    
                 const iframe = document.getElementById('gameIframe');
                 
                 if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
@@ -917,6 +1013,17 @@
                 return;
             }
             
+            // Re-check currentGame from window
+            currentGame = window.currentGame;
+            
+            if (!currentGame || !currentGame.id) {
+                console.error('❌ Game not loaded for submitRating:', { currentGame, window: window.currentGame });
+                alert('Game not loaded. Please refresh and try again.');
+                return;
+            }
+            
+            console.log('📊 Submitting rating:', { gameId: currentGame.id, rating: currentRating });
+            
             // Allow guests to rate on web platform
             try {
                 // Try to save rating to backend
@@ -974,7 +1081,12 @@
         
         function closeRatingModal() {
             document.getElementById('ratingModal').classList.add('hidden');
+            currentRating = 0; // Reset rating
+            updateStarDisplay();
         }
+        
+        // Make closeRatingModal available globally for onclick
+        window.closeRatingModal = closeRatingModal;
         
         async function trackPurchaseIntent(intent) {
             closePurchaseModal();
