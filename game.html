@@ -198,16 +198,6 @@
             <!-- Add Comment Form -->
             <div id="addCommentForm" class="comment-form">
                 <h3>Leave a Comment</h3>
-                <div class="rating-input">
-                    <label>Rating (optional):</label>
-                    <div class="comment-rating-stars">
-                        <span class="star" data-rating="1">⭐</span>
-                        <span class="star" data-rating="2">⭐</span>
-                        <span class="star" data-rating="3">⭐</span>
-                        <span class="star" data-rating="4">⭐</span>
-                        <span class="star" data-rating="5">⭐</span>
-                    </div>
-                </div>
                 <textarea id="commentText" placeholder="Share your thoughts about this game..." rows="4"></textarea>
                 <button id="commentSubmitBtn" class="btn btn-primary" onclick="postComment()">
                     <span class="button-text">Post Comment</span>
@@ -330,7 +320,6 @@
         let currentGame = window.currentGame;
         let currentRating = 0;
         let isLiked = false;
-        let currentCommentRating = 0;
         let comments = [];
         let commentsPage = 1;
         let hasMoreComments = true;
@@ -371,12 +360,10 @@
                 // Update stats
                 document.getElementById('likeCount').textContent = currentGame.likeCount || 0;
                 
-                // Check if user has liked
-                if (!Auth.isGuest) {
-                    const interactions = await API.getUserInteractions(gameId);
-                    isLiked = interactions.liked;
-                    updateLikeButton();
-                }
+                // Check if user has liked - skip for now as endpoint may not exist
+                // Will track locally for session
+                isLiked = false;
+                updateLikeButton();
                 
                 // Load the game directly - simplified approach
                 Logger.log('🎮 Loading game:', gameId);
@@ -828,24 +815,9 @@
                 button.disabled = true;
             }
             
-            // Setup rating stars for comments
-            document.querySelectorAll('.comment-rating-stars .star').forEach(star => {
-                star.addEventListener('click', (e) => {
-                    currentCommentRating = parseInt(e.target.dataset.rating);
-                    updateCommentStarDisplay();
-                });
-            });
+            // Rating removed from comments - use Rate button instead
         }
         
-        function updateCommentStarDisplay() {
-            document.querySelectorAll('.comment-rating-stars .star').forEach((star, index) => {
-                if (index < currentCommentRating) {
-                    star.classList.add('filled');
-                } else {
-                    star.classList.remove('filled');
-                }
-            });
-        }
         
         async function loadComments() {
             try {
@@ -951,7 +923,6 @@
             try {
                 const commentData = {
                     text,
-                    rating: currentCommentRating || undefined,
                     platform: 'pc' // Track as web comment
                 };
                 
@@ -965,8 +936,6 @@
                 
                 // Clear form
                 document.getElementById('commentText').value = '';
-                currentCommentRating = 0;
-                updateCommentStarDisplay();
                 
                 // Reload comments
                 commentsPage = 1;
