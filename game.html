@@ -584,6 +584,7 @@
             
             likeBtn.addEventListener('click', async () => {
                 Logger.log('Like button clicked! Current state:', { isLiked, likeCount: currentGame?.likeCount });
+                console.log('❤️ LIKE BUTTON CLICKED!', { isLiked, gameId: currentGame?.id });
                 
                 if (!currentGame || !currentGame.id) {
                     alert('Game not loaded yet. Please wait a moment and try again.');
@@ -597,23 +598,23 @@
                 // }
                 
                 try {
-                    // Try API call first
+                    // Toggle like state immediately for instant feedback
+                    isLiked = !isLiked;
+                    currentGame.likeCount = isLiked ? (currentGame.likeCount || 0) + 1 : Math.max(0, (currentGame.likeCount || 0) - 1);
+                    
+                    // Update UI immediately
+                    updateLikeButton();
+                    console.log('❤️ Like state updated:', { isLiked, newCount: currentGame.likeCount });
+                    
+                    // Try API call in background (don't wait)
                     if (isLiked) {
-                        try {
-                            await API.unlikeGame(currentGame.id);
-                        } catch (apiError) {
-                            Logger.warn('API unlike failed, using local storage:', apiError);
-                        }
-                        isLiked = false;
-                        currentGame.likeCount--;
+                        API.likeGame(currentGame.id).catch(err => 
+                            Logger.warn('API like failed (will use local storage):', err)
+                        );
                     } else {
-                        try {
-                            await API.likeGame(currentGame.id);
-                        } catch (apiError) {
-                            Logger.warn('API like failed, using local storage:', apiError);
-                        }
-                        isLiked = true;
-                        currentGame.likeCount++;
+                        API.unlikeGame(currentGame.id).catch(err => 
+                            Logger.warn('API unlike failed (will use local storage):', err)
+                        );
                     }
                     
                     // Store likes locally for persistence
