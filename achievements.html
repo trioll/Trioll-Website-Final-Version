@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements - Trioll</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/achievements.css">
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="js/cognito-auth.js"></script></head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="40">
+            </a>
+            <div class="nav-right">
+                <a href="index.html" class="nav-link">Games</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="inventory.html" class="nav-link">Inventory</a>
+                <a href="achievements.html" class="nav-link active">Achievements</a>
+                <button id="authBtn" class="auth-button">Login</button>
+                <div id="userMenu" class="user-menu hidden">
+                    <span id="username"></span>
+                    <button id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Achievements Content -->
+    <div class="container">
+        <div class="achievements-header">
+            <h1>Achievements</h1>
+            <div class="achievement-stats">
+                <div class="stat">
+                    <span class="stat-value" id="totalAchievements">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="unlockedAchievements">0</span>
+                    <span class="stat-label">Unlocked</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="achievementPoints">0</span>
+                    <span class="stat-label">Points</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Achievement Filters -->
+        <div class="achievement-filters">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="unlocked">Unlocked</button>
+            <button class="filter-btn" data-filter="locked">Locked</button>
+            <button class="filter-btn" data-filter="rare">Rare</button>
+            <button class="filter-btn" data-filter="recent">Recent</button>
+        </div>
+
+        <!-- Achievement Categories -->
+        <div class="achievement-categories">
+            <!-- General Achievements -->
+            <section class="achievement-category">
+                <h2>General</h2>
+                <div class="achievements-grid">
+                    <div class="achievement unlocked">
+                        <div class="achievement-icon">🎮</div>
+                        <div class="achievement-info">
+                            <h3>First Steps</h3>
+                            <p>Play your first game</p>
+                            <div class="achievement-meta">
+                                <span class="points">10 pts</span>
+                                <span class="unlock-date">Unlocked Jan 5, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement unlocked">
+                        <div class="achievement-icon">❤️</div>
+                        <div class="achievement-info">
+                            <h3>Spread the Love</h3>
+                            <p>Like 10 different games</p>
+                            <div class="achievement-meta">
+                                <span class="points">20 pts</span>
+                                <span class="unlock-date">Unlocked Jan 8, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked">
+                        <div class="achievement-icon">🌟</div>
+                        <div class="achievement-info">
+                            <h3>Star Critic</h3>
+                            <p>Rate 25 games</p>
+                            <div class="achievement-meta">
+                                <span class="points">30 pts</span>
+                                <span class="progress">Progress: 8/25</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked rare">
+                        <div class="achievement-icon">🏆</div>
+                        <div class="achievement-info">
+                            <h3>Completionist</h3>
+                            <p>Unlock all achievements in 5 games</p>
+                            <div class="achievement-meta">
+                                <span class="points">100 pts</span>
+                                <span class="rarity">Rare • 0.5% of players</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Playing Achievements -->
+            <section class="achievement-category">
+                <h2>Playing</h2>
+                <div class="achievements-grid">
+                    <div class="achievement unlocked">
+                        <div class="achievement-icon">⏱️</div>
+                        <div class="achievement-info">
+                            <h3>Weekend Warrior</h3>
+                            <p>Play for 5 hours in a weekend</p>
+                            <div class="achievement-meta">
+                                <span class="points">25 pts</span>
+                                <span class="unlock-date">Unlocked Jan 6, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked">
+                        <div class="achievement-icon">🔥</div>
+                        <div class="achievement-info">
+                            <h3>On Fire</h3>
+                            <p>Play games for 7 days in a row</p>
+                            <div class="achievement-meta">
+                                <span class="points">40 pts</span>
+                                <span class="progress">Progress: 3/7 days</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked">
+                        <div class="achievement-icon">🎯</div>
+                        <div class="achievement-info">
+                            <h3>High Scorer</h3>
+                            <p>Set a high score in 10 different games</p>
+                            <div class="achievement-meta">
+                                <span class="points">50 pts</span>
+                                <span class="progress">Progress: 2/10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Social Achievements -->
+            <section class="achievement-category">
+                <h2>Social</h2>
+                <div class="achievements-grid">
+                    <div class="achievement unlocked">
+                        <div class="achievement-icon">🔗</div>
+                        <div class="achievement-info">
+                            <h3>Sharing is Caring</h3>
+                            <p>Share a game with friends</p>
+                            <div class="achievement-meta">
+                                <span class="points">15 pts</span>
+                                <span class="unlock-date">Unlocked Jan 7, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked">
+                        <div class="achievement-icon">💬</div>
+                        <div class="achievement-info">
+                            <h3>Reviewer</h3>
+                            <p>Write 10 game reviews</p>
+                            <div class="achievement-meta">
+                                <span class="points">35 pts</span>
+                                <span class="progress">Progress: 0/10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Special Achievements -->
+            <section class="achievement-category">
+                <h2>Special</h2>
+                <div class="achievements-grid">
+                    <div class="achievement unlocked legendary">
+                        <div class="achievement-icon">🦄</div>
+                        <div class="achievement-info">
+                            <h3>Early Adopter</h3>
+                            <p>Join Trioll in the first month</p>
+                            <div class="achievement-meta">
+                                <span class="points">200 pts</span>
+                                <span class="rarity">Legendary • Limited Time</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="achievement locked secret">
+                        <div class="achievement-icon">❓</div>
+                        <div class="achievement-info">
+                            <h3>???</h3>
+                            <p>Hidden achievement</p>
+                            <div class="achievement-meta">
+                                <span class="points">??? pts</span>
+                                <span class="rarity">Secret</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="js/config.js?v=1758144185145"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/cors-fix.js"></script>
+    <script src="js/api.js?v=1758144185145"></script>
+    <script src="js/auth.js?v=1758144185145"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/init.js?v=1758144185145"></script>    <script>
+        let currentFilter = 'all';
+        
+        window.addEventListener('trioll-initialized', async () => {
+            
+            // Always redirect to login if no authenticated session
+            if (!Auth.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Track page view
+            Analytics.track('page_view', {
+                page: 'achievements',
+                source: 'web'
+            });
+            
+            // Setup auth buttons
+            document.getElementById('authBtn').addEventListener('click', () => {
+                if (Auth.isGuest) {
+                    localStorage.removeItem('trioll_guest_active');
+                    window.location.href = 'login.html';
+                } else {
+                    window.location.href = 'login.html';
+                }
+            });
+            
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                Auth.signOut();
+                window.location.href = 'login.html';
+            });
+            
+            // Setup filters
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelector('.filter-btn.active').classList.remove('active');
+                    e.target.classList.add('active');
+                    currentFilter = e.target.dataset.filter;
+                    filterAchievements();
+                });
+            });
+            
+            // Update stats
+            updateAchievementStats();
+            
+            // Add click handlers for achievements
+            document.querySelectorAll('.achievement').forEach(achievement => {
+                achievement.addEventListener('click', () => {
+                    showAchievementDetails(achievement);
+                });
+            });
+        });
+        
+        function updateAchievementStats() {
+            const total = document.querySelectorAll('.achievement').length;
+            const unlocked = document.querySelectorAll('.achievement.unlocked').length;
+            const points = unlocked * 30; // Simple calculation for demo
+            
+            document.getElementById('totalAchievements').textContent = total;
+            document.getElementById('unlockedAchievements').textContent = unlocked;
+            document.getElementById('achievementPoints').textContent = points;
+        }
+        
+        function filterAchievements() {
+            const achievements = document.querySelectorAll('.achievement');
+            
+            achievements.forEach(achievement => {
+                let show = false;
+                
+                switch(currentFilter) {
+                    case 'all':
+                        show = true;
+                        break;
+                    case 'unlocked':
+                        show = achievement.classList.contains('unlocked');
+                        break;
+                    case 'locked':
+                        show = !achievement.classList.contains('unlocked');
+                        break;
+                    case 'rare':
+                        show = achievement.classList.contains('rare') || achievement.classList.contains('legendary');
+                        break;
+                    case 'recent':
+                        show = achievement.classList.contains('unlocked');
+                        break;
+                }
+                
+                achievement.style.display = show ? 'flex' : 'none';
+            });
+            
+            // Hide empty categories
+            document.querySelectorAll('.achievement-category').forEach(category => {
+                const visibleAchievements = category.querySelectorAll('.achievement[style="display: flex;"], .achievement:not([style*="display"])');
+                category.style.display = visibleAchievements.length > 0 ? 'block' : 'none';
+            });
+            
+            Analytics.track('achievements_filtered', {
+                filter: currentFilter,
+                source: 'web'
+            });
+        }
+        
+        function showAchievementDetails(achievement) {
+            const isUnlocked = achievement.classList.contains('unlocked');
+            const title = achievement.querySelector('h3').textContent;
+            const description = achievement.querySelector('p').textContent;
+            
+            // In a real app, would show a modal with more details
+            Logger.log('Achievement clicked:', { title, description, isUnlocked });
+            
+            Analytics.track('achievement_viewed', {
+                achievement: title,
+                unlocked: isUnlocked,
+                source: 'web'
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+/* Loading spinner fix */
+#loadingSpinner {
+    display: none;
+}
+
+#loadingSpinner.show {
+    display: flex !important;
+}
+
+/* Ensure games grid is visible */
+#gamesGrid {
+    display: none;
+}
+
+#gamesGrid.show {
+    display: grid !important;
+}
+
+/* Debug styles to ensure visibility */
+.game-card {
+    min-height: 200px;
+    border: 1px solid #ccc;
+}

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Trioll</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/profile.css">
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="js/cognito-auth.js"></script></head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="40">
+            </a>
+            <div class="nav-right">
+                <a href="index.html" class="nav-link">Games</a>
+                <a href="profile.html" class="nav-link active">Profile</a>
+                <a href="inventory.html" class="nav-link">Inventory</a>
+                <a href="achievements.html" class="nav-link">Achievements</a>
+                <span class="guest-indicator hidden"></span>
+                <button id="authBtn" class="auth-button">Login</button>
+                <div id="userMenu" class="user-menu hidden">
+                    <span id="username"></span>
+                    <button id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Content -->
+    <div class="container">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <img id="avatarImage" src="assets/images/default-avatar.png" alt="Avatar">
+                <button class="edit-avatar-btn" onclick="editAvatar()">📷</button>
+            </div>
+            <div class="profile-info">
+                <h1 id="profileName">Guest User</h1>
+                <p id="profileEmail" class="profile-email">Not logged in</p>
+                <p id="profileBio" class="profile-bio">No bio yet</p>
+                <button class="btn btn-secondary" onclick="editProfile()">Edit Profile</button>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Games Played</h3>
+                <p class="stat-value" id="gamesPlayed">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Playtime</h3>
+                <p class="stat-value" id="totalPlaytime">0h</p>
+            </div>
+            <div class="stat-card">
+                <h3>Games Liked</h3>
+                <p class="stat-value" id="gamesLiked">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Games Rated</h3>
+                <p class="stat-value" id="gamesRated">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Achievements</h3>
+                <p class="stat-value" id="achievementCount">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>High Scores</h3>
+                <p class="stat-value" id="highScores">0</p>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <section class="activity-section">
+            <h2>Recent Activity</h2>
+            <div id="activityList" class="activity-list">
+                <p class="no-activity">No recent activity</p>
+            </div>
+        </section>
+
+        <!-- Favorite Games -->
+        <section class="favorites-section">
+            <h2>Favorite Games</h2>
+            <div id="favoriteGames" class="games-grid">
+                <p class="no-favorites">No favorite games yet</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditProfile()">&times;</span>
+            <h2>Edit Profile</h2>
+            <form id="editProfileForm">
+                <input type="text" id="editName" placeholder="Display Name" required>
+                <textarea id="editBio" placeholder="Tell us about yourself..." rows="4"></textarea>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js?v=1758144185148"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/cors-fix.js"></script>
+    <script src="js/auth.js?v=1758144185148"></script>
+    <script src="js/api.js?v=1758144185148"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/init.js?v=1758144185148"></script>    <script>
+        window.addEventListener('trioll-initialized', async () => {
+            
+            // Redirect to login if no session (neither authenticated nor guest)
+            if (!Auth.isAuthenticated() && !Auth.isGuest) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            loadProfile();
+            
+            // Track page view
+            Analytics.track('page_view', {
+                page: 'profile',
+                source: 'web'
+            });
+            
+            // Setup auth buttons
+            document.getElementById('authBtn').addEventListener('click', () => {
+                if (Auth.isGuest) {
+                    localStorage.removeItem('trioll_guest_active');
+                    window.location.href = 'login.html';
+                } else {
+                    window.location.href = 'login.html';
+                }
+            });
+            
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                Auth.signOut();
+                window.location.href = 'login.html';
+            });
+            
+            // Setup edit profile form
+            document.getElementById('editProfileForm').addEventListener('submit', saveProfile);
+        });
+        
+        async function loadProfile() {
+            // Update basic info
+            if (Auth.isAuthenticated()) {
+                try {
+                    // Get profile from API
+                    const profile = await API.getUserProfile();
+                    if (profile) {
+                        document.getElementById('profileName').textContent = profile.name || profile.username || 'User';
+                        document.getElementById('profileEmail').textContent = profile.email || 'Email not available';
+                        document.getElementById('profileBio').textContent = profile.bio || 'Welcome to Trioll!';
+                        
+                        // Update avatar if available
+                        if (profile.avatarUrl) {
+                            document.getElementById('avatarImage').src = profile.avatarUrl;
+                        }
+                    } else {
+                        // Fallback to Cognito data
+                        const { Auth } = Amplify;
+                        const user = await Auth.currentAuthenticatedUser();
+                        document.getElementById('profileName').textContent = user.attributes?.name || user.username || 'User';
+                        document.getElementById('profileEmail').textContent = user.attributes?.email || 'Email not available';
+                        document.getElementById('profileBio').textContent = 'Welcome to Trioll!';
+                    }
+                    
+                    // Show edit button for authenticated users
+                    document.querySelector('.edit-profile-btn').style.display = 'inline-block';
+                } catch (error) {
+                    Logger.error('Error loading user:', error);
+                }
+            } else {
+                document.getElementById('profileName').textContent = 'Guest User';
+                document.getElementById('profileEmail').textContent = `Guest ID: ${Auth.getGuestId()}`;
+                document.getElementById('profileBio').textContent = 'Playing as guest';
+                
+                // Hide edit button for guests
+                document.querySelector('.edit-profile-btn').style.display = 'none';
+            }
+            
+            // Load real stats from API
+            loadStats();
+            
+            // Load recent activity from API
+            loadActivity();
+            
+            // Load favorite games from API
+            loadFavoriteGames();
+        }
+        
+        async function loadStats() {
+            try {
+                // Get stats from API - this includes data from both web and mobile
+                const stats = await API.getUserStats();
+                
+                // Update the UI with combined stats
+                document.getElementById('gamesPlayed').textContent = stats.gamesPlayed || 0;
+                document.getElementById('totalPlaytime').textContent = stats.totalPlaytime || '0h';
+                document.getElementById('gamesLiked').textContent = stats.gamesLiked || 0;
+                document.getElementById('gamesRated').textContent = stats.gamesRated || 0;
+                document.getElementById('achievementCount').textContent = stats.achievementCount || 0;
+                document.getElementById('highScores').textContent = stats.highScores || 0;
+                
+                // Show platform breakdown if available
+                if (stats.platforms) {
+                    Logger.log('Platform stats:', stats.platforms);
+                    // Could add UI elements to show platform-specific stats
+                }
+            } catch (error) {
+                Logger.error('Error loading stats:', error);
+                // Show default values on error
+                document.getElementById('gamesPlayed').textContent = '0';
+                document.getElementById('totalPlaytime').textContent = '0h';
+                document.getElementById('gamesLiked').textContent = '0';
+                document.getElementById('gamesRated').textContent = '0';
+                document.getElementById('achievementCount').textContent = '0';
+                document.getElementById('highScores').textContent = '0';
+            }
+        }
+        
+        async function loadActivity() {
+            const activityList = document.getElementById('activityList');
+            activityList.innerHTML = '<div class="loading">Loading activity...</div>';
+            
+            try {
+                // Get recent activity from API - includes both web and mobile activity
+                const response = await API.getUserActivity(10);
+                const activities = response.activities || [];
+                
+                activityList.innerHTML = '';
+                
+                if (activities.length === 0) {
+                    activityList.innerHTML = '<p class="no-activity">No recent activity. Start playing games!</p>';
+                    return;
+                }
+                
+                activities.forEach(activity => {
+                    const item = document.createElement('div');
+                    item.className = 'activity-item';
+                    
+                    let icon, text, platformBadge = '';
+                    
+                    // Add platform badge
+                    if (activity.platform) {
+                        platformBadge = `<span class="platform-badge ${activity.platform}">${activity.platform}</span>`;
+                    }
+                    
+                    switch(activity.type) {
+                        case 'play':
+                            icon = '▶️';
+                            text = `Played ${activity.gameName || activity.game}`;
+                            break;
+                        case 'like':
+                            icon = '❤️';
+                            text = `Liked ${activity.gameName || activity.game}`;
+                            break;
+                        case 'rating':
+                            icon = '⭐';
+                            text = `Rated ${activity.gameName || activity.game} ${activity.rating}/5`;
+                            break;
+                        case 'bookmark':
+                            icon = '🔖';
+                            text = `Bookmarked ${activity.gameName || activity.game}`;
+                            break;
+                        case 'comment':
+                            icon = '💬';
+                            text = `Commented on ${activity.gameName || activity.game}`;
+                            break;
+                        case 'achievement':
+                            icon = '🏆';
+                            text = `Unlocked "${activity.achievement}" in ${activity.gameName || activity.game}`;
+                            break;
+                        default:
+                            icon = '📌';
+                            text = activity.description || 'Activity';
+                    }
+                    
+                    item.innerHTML = `
+                        <span class="activity-icon">${icon}</span>
+                        <div class="activity-details">
+                            <p>${text} ${platformBadge}</p>
+                            <span class="activity-time">${API.formatTimeAgo(activity.timestamp ? new Date(activity.timestamp).getTime() : Date.now())}</span>
+                        </div>
+                    `;
+                    
+                    activityList.appendChild(item);
+                });
+            } catch (error) {
+                Logger.error('Failed to load activity:', error);
+                activityList.innerHTML = '<p class="error">Failed to load activity</p>';
+                
+                // Fallback to localStorage for offline support
+                const localActivity = JSON.parse(localStorage.getItem('trioll_recent_activity') || '[]');
+                if (localActivity.length > 0) {
+                    activityList.innerHTML = '';
+                    localActivity.slice(-10).reverse().forEach(activity => {
+                        // Use existing local rendering logic
+                        const item = document.createElement('div');
+                        item.className = 'activity-item';
+                        
+                        let icon, text;
+                        switch(activity.type) {
+                            case 'play':
+                                icon = '▶️';
+                                text = `Played ${activity.game}`;
+                                break;
+                            case 'like':
+                                icon = '❤️';
+                                text = `Liked ${activity.game}`;
+                                break;
+                            default:
+                                icon = '📌';
+                                text = 'Activity';
+                        }
+                        
+                        item.innerHTML = `
+                            <span class="activity-icon">${icon}</span>
+                            <div class="activity-details">
+                                <p>${text} <span class="platform-badge web">web</span></p>
+                                <span class="activity-time">${API.formatTimeAgo(activity.timestamp || Date.now())}</span>
+                            </div>
+                        `;
+                        
+                        activityList.appendChild(item);
+                    });
+                }
+            }
+        }
+        
+        async function loadFavoriteGames() {
+            const favoritesGrid = document.getElementById('favoriteGames');
+            favoritesGrid.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                // Get user's liked games from API - includes games liked on both web and mobile
+                const response = await API.getUserLikedGames(4);
+                const games = response.games || [];
+                
+                favoritesGrid.innerHTML = '';
+                
+                if (games.length === 0) {
+                    favoritesGrid.innerHTML = '<p class="no-favorites">No favorite games yet. Like some games to see them here!</p>';
+                    return;
+                }
+                
+                games.forEach(game => {
+                    const card = document.createElement('div');
+                    card.className = 'game-card small';
+                    
+                    // Add platform indicator if available
+                    const platformBadge = game.likedOn ? `<span class="platform-indicator">${game.likedOn}</span>` : '';
+                    
+                    card.innerHTML = `
+                        <div class="game-thumbnail">
+                            <img src="${game.thumbnailUrl || 'assets/images/default-game.png'}" alt="${game.name}">
+                            ${platformBadge}
+                        </div>
+                        <div class="game-info">
+                            <h4>${game.name}</h4>
+                            <p class="game-developer">${game.developerName || ''}</p>
+                        </div>
+                    `;
+                    
+                    card.addEventListener('click', () => {
+                        window.location.href = `game.html?id=${game.id || game.gameId}`;
+                    });
+                    
+                    favoritesGrid.appendChild(card);
+                });
+            } catch (error) {
+                Logger.error('Failed to load favorite games:', error);
+                favoritesGrid.innerHTML = '<p class="error">Failed to load favorite games</p>';
+                
+                // Fallback to localStorage
+                const localLikedGames = JSON.parse(localStorage.getItem('trioll_liked_games') || '[]');
+                if (localLikedGames.length > 0) {
+                    favoritesGrid.innerHTML = '';
+                    localLikedGames.slice(0, 4).forEach(game => {
+                        const card = document.createElement('div');
+                        card.className = 'game-card small';
+                        card.innerHTML = `
+                            <div class="game-thumbnail">
+                                <img src="${game.thumbnailUrl || 'assets/images/default-game.png'}" alt="${game.name}">
+                                <span class="platform-indicator">web</span>
+                            </div>
+                            <div class="game-info">
+                                <h4>${game.name}</h4>
+                            </div>
+                        `;
+                        
+                        card.addEventListener('click', () => {
+                            window.location.href = `game.html?id=${game.id || game.gameId}`;
+                        });
+                        
+                        favoritesGrid.appendChild(card);
+                    });
+                }
+            }
+        }
+        
+        function editProfile() {
+            document.getElementById('editProfileModal').classList.remove('hidden');
+            
+            // Pre-fill current values
+            const currentName = document.getElementById('profileName').textContent;
+            const currentBio = document.getElementById('profileBio').textContent;
+            
+            document.getElementById('editName').value = currentName !== 'Guest User' ? currentName : '';
+            document.getElementById('editBio').value = currentBio !== 'No bio yet' ? currentBio : '';
+        }
+        
+        function closeEditProfile() {
+            document.getElementById('editProfileModal').classList.add('hidden');
+        }
+        
+        async function saveProfile(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('editName').value;
+            const bio = document.getElementById('editBio').value;
+            
+            // Update display
+            document.getElementById('profileName').textContent = name;
+            document.getElementById('profileBio').textContent = bio || 'No bio yet';
+            
+            closeEditProfile();
+            
+            // Track profile edit
+            Analytics.track('profile_edit', {
+                source: 'web'
+            });
+            
+            // In real app, would save to backend
+            alert('Profile updated!');
+        }
+        
+        function editAvatar() {
+            // In real app, would open file picker
+            alert('Avatar upload coming soon!');
+        }
+    </script>
+</body>
+</html>

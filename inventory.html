@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory - Trioll</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/inventory.css">
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="js/cognito-auth.js"></script></head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="40">
+            </a>
+            <div class="nav-right">
+                <a href="index.html" class="nav-link">Games</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="inventory.html" class="nav-link active">Inventory</a>
+                <a href="achievements.html" class="nav-link">Achievements</a>
+                <span class="guest-indicator hidden"></span>
+                <button id="authBtn" class="auth-button">Login</button>
+                <div id="userMenu" class="user-menu hidden">
+                    <span id="username"></span>
+                    <button id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Inventory Content -->
+    <div class="container">
+        <h1>My Game Inventory</h1>
+        
+        <!-- Inventory Tabs -->
+        <div class="inventory-tabs">
+            <button class="tab-btn active" data-tab="bookmarked">Bookmarked Games</button>
+            <button class="tab-btn" data-tab="liked">Liked Games</button>
+            <button class="tab-btn" data-tab="recent">Recently Played</button>
+            <button class="tab-btn" data-tab="codes">Saved Codes</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="tabContent" class="tab-content">
+            <!-- Bookmarked Games Tab -->
+            <div id="bookmarkedTab" class="tab-pane active">
+                <div class="tab-header">
+                    <h2>Bookmarked Games</h2>
+                    <p class="tab-description">Games you've saved for later</p>
+                </div>
+                <div id="bookmarkedGames" class="games-grid">
+                    <div class="empty-state">
+                        <span class="empty-icon">🔖</span>
+                        <p>No bookmarked games yet</p>
+                        <a href="index.html" class="btn btn-primary">Browse Games</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liked Games Tab -->
+            <div id="likedTab" class="tab-pane hidden">
+                <div class="tab-header">
+                    <h2>Liked Games</h2>
+                    <p class="tab-description">Games you've given a thumbs up</p>
+                </div>
+                <div id="likedGames" class="games-grid">
+                    <div class="empty-state">
+                        <span class="empty-icon">❤️</span>
+                        <p>No liked games yet</p>
+                        <a href="index.html" class="btn btn-primary">Browse Games</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recently Played Tab -->
+            <div id="recentTab" class="tab-pane hidden">
+                <div class="tab-header">
+                    <h2>Recently Played</h2>
+                    <p class="tab-description">Your gaming history</p>
+                </div>
+                <div id="recentGames" class="games-grid">
+                    <div class="empty-state">
+                        <span class="empty-icon">🎮</span>
+                        <p>No games played yet</p>
+                        <a href="index.html" class="btn btn-primary">Start Playing</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saved Codes Tab -->
+            <div id="codesTab" class="tab-pane hidden">
+                <div class="tab-header">
+                    <h2>Saved Game Codes</h2>
+                    <p class="tab-description">Your collection of game codes and save states</p>
+                </div>
+                <div class="codes-container">
+                    <button class="btn btn-primary" onclick="addNewCode()">+ Add New Code</button>
+                    <div id="codesList" class="codes-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">💾</span>
+                            <p>No saved codes yet</p>
+                            <p class="text-muted">Save game codes to access them later</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Code Modal -->
+    <div id="addCodeModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddCodeModal()">&times;</span>
+            <h2>Add Game Code</h2>
+            <form id="addCodeForm">
+                <input type="text" id="codeGameName" placeholder="Game Name" required>
+                <input type="text" id="codeValue" placeholder="Enter Code" required>
+                <textarea id="codeNotes" placeholder="Notes (optional)" rows="3"></textarea>
+                <button type="submit" class="btn btn-primary">Save Code</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js?v=1758144185147"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/cors-fix.js"></script>
+    <script src="js/api.js?v=1758144185147"></script>
+    <script src="js/auth.js?v=1758144185147"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/init.js?v=1758144185147"></script>    <script>
+        let currentTab = 'bookmarked';
+        const savedCodes = JSON.parse(localStorage.getItem('trioll_saved_codes') || '[]');
+        
+        window.addEventListener('trioll-initialized', async () => {
+            
+            // Redirect to login if no session (neither authenticated nor guest)
+            if (!Auth.isAuthenticated() && !Auth.isGuest) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Track page view
+            Analytics.track('page_view', {
+                page: 'inventory',
+                source: 'web'
+            });
+            
+            // Setup auth buttons
+            document.getElementById('authBtn').addEventListener('click', () => {
+                if (Auth.isGuest) {
+                    localStorage.removeItem('trioll_guest_active');
+                    window.location.href = 'login.html';
+                } else {
+                    window.location.href = 'login.html';
+                }
+            });
+            
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                Auth.signOut();
+                window.location.href = 'login.html';
+            });
+            
+            // Setup tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    switchTab(e.target.dataset.tab);
+                });
+            });
+            
+            // Setup code form
+            document.getElementById('addCodeForm').addEventListener('submit', saveCode);
+            
+            // Load initial data
+            loadInventory();
+        });
+        
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tabName);
+            });
+            
+            // Update tab panes
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.add('hidden');
+            });
+            
+            switch(tabName) {
+                case 'bookmarked':
+                    document.getElementById('bookmarkedTab').classList.remove('hidden');
+                    break;
+                case 'liked':
+                    document.getElementById('likedTab').classList.remove('hidden');
+                    break;
+                case 'recent':
+                    document.getElementById('recentTab').classList.remove('hidden');
+                    break;
+                case 'codes':
+                    document.getElementById('codesTab').classList.remove('hidden');
+                    loadSavedCodes();
+                    break;
+            }
+            
+            Analytics.track('inventory_tab_switch', {
+                tab: tabName,
+                source: 'web'
+            });
+        }
+        
+        async function loadInventory() {
+            // Try to load from API first
+            if (Auth.isAuthenticated() || Auth.isGuest) {
+                try {
+                    // Load liked games from API
+                    const likedResponse = await API.getUserLikedGames(20);
+                    displayGames('likedGames', likedResponse.games || []);
+                    
+                    // For bookmarked and recent, still use localStorage for now
+                    // TODO: Add API endpoints for these
+                    const bookmarkedGames = JSON.parse(localStorage.getItem('trioll_bookmarked_games') || '[]');
+                    const recentGames = JSON.parse(localStorage.getItem('trioll_recent_games') || '[]');
+                    
+                    displayGames('bookmarkedGames', bookmarkedGames);
+                    displayGames('recentGames', recentGames.slice(-12).reverse());
+                } catch (error) {
+                    Logger.error('Failed to load from API, using local data:', error);
+                    loadLocalInventory();
+                }
+            } else {
+                loadLocalInventory();
+            }
+            
+            // Load saved codes
+            loadSavedCodes();
+        }
+        
+        function loadLocalInventory() {
+            // Fallback to localStorage
+            const bookmarkedGames = JSON.parse(localStorage.getItem('trioll_bookmarked_games') || '[]');
+            const likedGames = JSON.parse(localStorage.getItem('trioll_liked_games') || '[]');
+            const recentGames = JSON.parse(localStorage.getItem('trioll_recent_games') || '[]');
+            
+            displayGames('bookmarkedGames', bookmarkedGames);
+            displayGames('likedGames', likedGames);
+            displayGames('recentGames', recentGames.slice(-12).reverse());
+        }
+        
+        function displayGames(containerId, games) {
+            const container = document.getElementById(containerId);
+            
+            if (!container) return;
+            
+            if (games.length === 0) {
+                container.innerHTML = '<p class="no-games">No games yet</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            games.forEach(game => {
+                const card = createGameCard(game);
+                container.appendChild(card);
+            });
+        }
+        
+        function createGameCard(game) {
+            const card = document.createElement('div');
+            card.className = 'game-card';
+            card.innerHTML = `
+                <div class="game-thumbnail">
+                    <img src="${game.thumbnailUrl || 'assets/images/default-game.png'}" 
+                         alt="${game.name}" 
+                         loading="lazy">
+                    <div class="play-overlay">
+                        <button class="play-button">▶</button>
+                    </div>
+                </div>
+                <div class="game-info">
+                    <h3>${game.name}</h3>
+                    <p>${game.developerName || 'Unknown Developer'}</p>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                window.location.href = `game.html?id=${game.id || game.gameId}`;
+            });
+            
+            return card;
+        }
+        
+        function loadSavedCodes() {
+            const codesList = document.getElementById('codesList');
+            
+            if (savedCodes.length === 0) {
+                return; // Keep empty state
+            }
+            
+            codesList.innerHTML = '';
+            savedCodes.forEach((code, index) => {
+                const codeItem = document.createElement('div');
+                codeItem.className = 'code-item';
+                codeItem.innerHTML = `
+                    <div class="code-header">
+                        <h4>${code.gameName}</h4>
+                        <button class="delete-btn" onclick="deleteCode(${index})">🗑️</button>
+                    </div>
+                    <div class="code-value">
+                        <code>${code.code}</code>
+                        <button class="copy-btn" onclick="copyCode('${code.code}')">📋</button>
+                    </div>
+                    ${code.notes ? `<p class="code-notes">${code.notes}</p>` : ''}
+                    <span class="code-date">Saved ${new Date(code.savedAt).toLocaleDateString()}</span>
+                `;
+                
+                codesList.appendChild(codeItem);
+            });
+        }
+        
+        function addNewCode() {
+            document.getElementById('addCodeModal').classList.remove('hidden');
+        }
+        
+        function closeAddCodeModal() {
+            document.getElementById('addCodeModal').classList.add('hidden');
+            document.getElementById('addCodeForm').reset();
+        }
+        
+        function saveCode(e) {
+            e.preventDefault();
+            
+            const newCode = {
+                gameName: document.getElementById('codeGameName').value,
+                code: document.getElementById('codeValue').value,
+                notes: document.getElementById('codeNotes').value,
+                savedAt: Date.now()
+            };
+            
+            savedCodes.push(newCode);
+            localStorage.setItem('trioll_saved_codes', JSON.stringify(savedCodes));
+            
+            closeAddCodeModal();
+            loadSavedCodes();
+            
+            Analytics.track('code_saved', {
+                gameName: newCode.gameName,
+                source: 'web'
+            });
+        }
+        
+        function deleteCode(index) {
+            if (confirm('Delete this code?')) {
+                savedCodes.splice(index, 1);
+                localStorage.setItem('trioll_saved_codes', JSON.stringify(savedCodes));
+                loadSavedCodes();
+                
+                Analytics.track('code_deleted', {
+                    source: 'web'
+                });
+            }
+        }
+        
+        function copyCode(code) {
+            navigator.clipboard.writeText(code);
+            alert('Code copied to clipboard!');
+            
+            Analytics.track('code_copied', {
+                source: 'web'
+            });
+        }
+        
+        // Make functions available globally
+        window.addNewCode = addNewCode;
+        window.closeAddCodeModal = closeAddCodeModal;
+        window.deleteCode = deleteCode;
+        window.copyCode = copyCode;
+        
+        async function removeBookmark(gameId) {
+            // In real app, would call API
+            alert('Bookmark removed!');
+            location.reload();
+        }
+        
+        async function removeLike(gameId) {
+            // In real app, would call API
+            alert('Like removed!');
+            location.reload();
+        }
+    </script>
+</body>
+</html>

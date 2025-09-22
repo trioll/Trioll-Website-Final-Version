@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Trioll - Login</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/login.css">
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1413.0.min.js"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/cognito-auth.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/google-auth.js"></script>
+    <style>
+        /* Google Sign-In button adjustments */
+        #google-signin-button {
+            margin: 20px auto;
+            max-width: 280px;
+        }
+        .social-divider {
+            position: relative;
+            text-align: center;
+            margin: 25px 0;
+        }
+        .social-divider span {
+            background: var(--bg-dark, #0a0a0a);
+            padding: 0 15px;
+            position: relative;
+            z-index: 1;
+            color: var(--text-gray-400, #9ca3af);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .social-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border-gray, #333);
+            z-index: 0;
+        }
+        .social-benefits {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--text-gray-400, #9ca3af);
+        }
+        .social-benefits i {
+            color: var(--accent-green, #10b981);
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo -->
+        <div class="login-logo">
+            <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="60">
+        </div>
+        
+        <!-- Welcome Message -->
+        <div class="welcome-section">
+            <h1>Welcome to Trioll Games</h1>
+            <p>Discover and play amazing games instantly in your browser</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="loginForm" class="auth-form">
+            <h2>Login to Your Account</h2>
+            
+            <form id="loginFormElement">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" onclick="showForgotPassword(event)" class="forgot-link">Forgot password?</a>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Login</button>
+                
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" onclick="showResendVerification(event)" style="font-size: 0.875rem; color: #8b5cf6;">Account not verified? Resend email</a>
+                </div>
+            </form>
+            
+            <div class="social-divider">
+                <span>or</span>
+            </div>
+            
+            <!-- Google Sign-In Button Container -->
+            <div id="google-signin-button"></div>
+            
+            <div class="social-benefits">
+                <i class="fas fa-shield-alt"></i>
+                Secure one-click sign in
+            </div>
+            
+            <div class="form-divider" style="margin-top: 20px;">
+                <span>OR</span>
+            </div>
+            
+            <button class="btn btn-guest" onclick="continueAsGuest()">
+                Continue as Guest
+            </button>
+            
+            <p class="form-footer">
+                Don't have an account? 
+                <a href="#" onclick="showSignupForm(event)">Create one</a>
+            </p>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="signupForm" class="auth-form hidden">
+            <h2>Create Your Account</h2>
+            
+            <form id="signupFormElement">
+                <input type="email" id="signupEmail" placeholder="Email" required>
+                <input type="password" id="signupPassword" placeholder="Password" required>
+                <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+                
+                <div class="password-requirements">
+                    <p>Password must contain:</p>
+                    <ul>
+                        <li id="reqLength">At least 8 characters</li>
+                        <li id="reqUpper">One uppercase letter</li>
+                        <li id="reqLower">One lowercase letter</li>
+                        <li id="reqNumber">One number</li>
+                        <li id="reqSpecial">One special character</li>
+                    </ul>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+            
+            <div class="social-divider">
+                <span>or</span>
+            </div>
+            
+            <!-- Google Sign-In Button for Signup -->
+            <div id="google-signin-button-signup"></div>
+            
+            <div class="social-benefits">
+                <i class="fas fa-bolt"></i>
+                Skip email verification with Google
+            </div>
+            
+            <div class="form-divider">
+                <span>OR</span>
+            </div>
+            
+            <button class="btn btn-guest" onclick="continueAsGuest()">
+                Continue as Guest
+            </button>
+            
+            <p class="form-footer">
+                Already have an account? 
+                <a href="#" onclick="showLoginForm(event)">Login</a>
+            </p>
+        </div>
+
+        <!-- Email Verification Form -->
+        <div id="verificationForm" class="auth-form hidden">
+            <h2>Verify Your Email</h2>
+            <p>We've sent a verification code to <span id="verificationEmail"></span></p>
+            <p style="font-size: 0.9em; color: #999; margin: 10px 0;">
+                Check your email inbox (and spam folder) for a 6-digit code from AWS.<br>
+                The sender will be: noreply@verificationemail.com
+            </p>
+            
+            <form id="verificationFormElement">
+                <input type="text" id="verificationCode" placeholder="Enter 6-digit code" maxlength="6" required>
+                
+                <button type="submit" class="btn btn-primary">Verify Email</button>
+            </form>
+            
+            <p class="form-footer">
+                Didn't receive the code? 
+                <a href="#" onclick="resendCode(event)">Resend</a>
+            </p>
+        </div>
+
+        <!-- Forgot Password Form -->
+        <div id="forgotForm" class="auth-form hidden">
+            <h2>Reset Your Password</h2>
+            <p>Enter your email and we'll send you a reset code</p>
+            
+            <form id="forgotFormElement">
+                <input type="email" id="forgotEmail" placeholder="Email" required>
+                
+                <button type="submit" class="btn btn-primary">Send Reset Code</button>
+            </form>
+            
+            <p class="form-footer">
+                Remember your password? 
+                <a href="#" onclick="showLoginForm(event)">Login</a>
+            </p>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <p id="loadingMessage">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div id="messageToast" class="message-toast hidden">
+        <p id="messageText"></p>
+    </div>
+
+    <script src="js/config.js?v=1758144185147"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/auth.js?v=1758144185147"></script>
+    <script src="js/cognito-auth.js?v=1758144185147"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/google-signin.js"></script>
+    <script src="js/login-init.js"></script>
+    <script>
+        let currentEmail = '';
+        
+        // Initialize
+        // Setup Google Sign-In
+        window.addEventListener('load', () => {
+            // Wait for Google Sign-In to initialize
+            setTimeout(() => {
+                if (window.GoogleAuth && GoogleAuth.isInitialized) {
+                    // Render button in login form
+                    GoogleAuth.renderButton('google-signin-button', {
+                        theme: 'filled_blue',
+                        size: 'large',
+                        text: 'signin_with',
+                        width: 280
+                    });
+                    
+                    // Render button in signup form
+                    GoogleAuth.renderButton('google-signin-button-signup', {
+                        theme: 'filled_blue',
+                        size: 'large',
+                        text: 'signup_with',
+                        width: 280
+                    });
+                } else {
+                    Logger.warn('Google Sign-In not initialized. Please configure GOOGLE_CLIENT_ID in config.js');
+                }
+            }, 1000);
+        });
+        
+        window.addEventListener('trioll-initialized', async () => {
+            
+            // Check if already logged in or has active guest session
+            if (Auth.isAuthenticated() || Auth.isGuest) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Check for remembered login
+            const remembered = localStorage.getItem('rememberedEmail');
+            if (remembered) {
+                document.getElementById('loginEmail').value = remembered;
+                document.getElementById('rememberMe').checked = true;
+            }
+            
+            // Setup form handlers
+            document.getElementById('loginFormElement').addEventListener('submit', handleLogin);
+            document.getElementById('signupFormElement').addEventListener('submit', handleSignup);
+            document.getElementById('verificationFormElement').addEventListener('submit', handleVerification);
+            document.getElementById('forgotFormElement').addEventListener('submit', handleForgotPassword);
+            
+            // Password validation
+            document.getElementById('signupPassword').addEventListener('input', validatePassword);
+            
+            // Track page view
+            Analytics.track('page_view', { page: 'login', source: 'web' });
+        });
+        
+        // Form switching
+        function showLoginForm(e) {
+            e?.preventDefault();
+            hideAllForms();
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+        
+        function showSignupForm(e) {
+            e?.preventDefault();
+            hideAllForms();
+            document.getElementById('signupForm').classList.remove('hidden');
+        }
+        
+        function showVerificationForm(email) {
+            hideAllForms();
+            currentEmail = email;
+            document.getElementById('verificationEmail').textContent = email;
+            document.getElementById('verificationForm').classList.remove('hidden');
+        }
+        
+        function showForgotPassword(e) {
+            e?.preventDefault();
+            hideAllForms();
+            document.getElementById('forgotForm').classList.remove('hidden');
+        }
+        
+        function showResendVerification(e) {
+            e?.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            
+            if (!email) {
+                showMessage('Please enter your email address first', true);
+                return;
+            }
+            
+            // Show loading
+            showLoading('Sending verification email...');
+            
+            Auth.resendVerificationCode(email).then(result => {
+                hideLoading();
+                
+                if (result.success) {
+                    showMessage('Verification email sent! Please check your inbox.', false);
+                } else {
+                    // Show the actual error with helpful message
+                    showMessage(result.error || 'Failed to send verification email. Please check your spam folder.', true);
+                }
+            });
+        }
+        
+        function hideAllForms() {
+            document.querySelectorAll('.auth-form').forEach(form => {
+                form.classList.add('hidden');
+            });
+        }
+        
+        // Loading state
+        function showLoading(message = 'Processing...') {
+            document.getElementById('loadingMessage').textContent = message;
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+        
+        // Messages
+        function showMessage(message, isError = false) {
+            const toast = document.getElementById('messageToast');
+            const text = document.getElementById('messageText');
+            
+            text.textContent = message;
+            toast.classList.remove('hidden', 'success', 'error');
+            toast.classList.add(isError ? 'error' : 'success');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Login handler
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            
+            showLoading('Logging in...');
+            
+            const result = await Auth.signIn(email, password);
+            hideLoading();
+            
+            if (result.success) {
+                if (rememberMe) {
+                    localStorage.setItem('rememberedEmail', email);
+                } else {
+                    localStorage.removeItem('rememberedEmail');
+                }
+                
+                Analytics.track('user_login', { method: 'email', source: 'web' });
+                window.location.href = 'index.html';
+            } else {
+                // Check if account needs confirmation
+                if (result.needsConfirmation) {
+                    showMessage(result.error, true);
+                    
+                    // Show resend verification code button
+                    const messageDiv = document.querySelector('.message');
+                    if (messageDiv) {
+                        const resendBtn = document.createElement('button');
+                        resendBtn.className = 'btn btn-secondary';
+                        resendBtn.style.marginTop = '10px';
+                        resendBtn.style.width = '100%';
+                        resendBtn.textContent = 'Resend Verification Email';
+                        resendBtn.onclick = async () => {
+                            resendBtn.disabled = true;
+                            resendBtn.textContent = 'Sending...';
+                            
+                            const resendResult = await Auth.resendVerificationCode(email);
+                            
+                            if (resendResult.success) {
+                                showMessage('Verification email sent! Please check your inbox.', false);
+                                resendBtn.textContent = 'Email Sent!';
+                            } else {
+                                showMessage(resendResult.error || 'Failed to send email. Email service may not be configured.', true);
+                                resendBtn.disabled = false;
+                                resendBtn.textContent = 'Resend Verification Email';
+                            }
+                        };
+                        
+                        messageDiv.appendChild(resendBtn);
+                    }
+                } else {
+                    showMessage(result.error || 'Login failed', true);
+                }
+            }
+        }
+        
+        // Signup handler
+        async function handleSignup(e) {
+            e.preventDefault();
+            Logger.log('📝 Signup form submitted');
+            
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            Logger.log('📧 Signing up with email:', email);
+            
+            if (password !== confirmPassword) {
+                showMessage('Passwords do not match', true);
+                return;
+            }
+            
+            // Check if Auth is available
+            if (typeof Auth === 'undefined' || typeof Auth.signUp !== 'function') {
+                Logger.error('❌ Auth service not available');
+                showMessage('Authentication service not available. Please refresh and try again.', true);
+                return;
+            }
+            
+            showLoading('Creating account...');
+            
+            try {
+                Logger.log('🔄 Calling Auth.signUp...');
+                const result = await Auth.signUp(email, password);
+                Logger.log('📤 Signup result:', result);
+                hideLoading();
+                
+                if (result.success) {
+                    showMessage('Account created successfully! Check your email (including spam folder) for a verification code from Trioll.');
+                    showVerificationForm(email);
+                    
+                    // Track analytics if available
+                    if (typeof Analytics !== 'undefined') {
+                        Analytics.track('user_signup', { method: 'email', source: 'web' });
+                    }
+                } else {
+                    showMessage(result.error || 'Signup failed', true);
+                }
+            } catch (error) {
+                Logger.error('❌ Signup error:', error);
+                hideLoading();
+                showMessage(error.message || 'Signup failed. Please try again.', true);
+            }
+        }
+        
+        // Verification handler
+        async function handleVerification(e) {
+            e.preventDefault();
+            
+            const code = document.getElementById('verificationCode').value;
+            
+            showLoading('Verifying email...');
+            
+            const result = await Auth.confirmSignUp(currentEmail, code);
+            hideLoading();
+            
+            if (result.success) {
+                showMessage('Email verified! You can now login.');
+                showLoginForm();
+                document.getElementById('loginEmail').value = currentEmail;
+            } else {
+                showMessage(result.error || 'Verification failed', true);
+            }
+        }
+        
+        // Forgot password handler
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgotEmail').value;
+            
+            showLoading('Sending reset code...');
+            
+            // This would call Auth.forgotPassword(email)
+            // For now, just show a message
+            setTimeout(() => {
+                hideLoading();
+                showMessage('Reset code sent! Check your email.');
+                showLoginForm();
+            }, 1500);
+        }
+        
+        // Resend verification code
+        async function resendCode(e) {
+            e.preventDefault();
+            
+            if (!currentEmail) {
+                showMessage('No email address available', true);
+                return;
+            }
+            
+            showLoading('Resending code...');
+            
+            const result = await Auth.resendVerificationCode(currentEmail);
+            hideLoading();
+            
+            if (result.success) {
+                showMessage('New verification code sent! Check your email (including spam folder) for a code from Trioll.');
+            } else {
+                showMessage(result.error || 'Failed to resend code', true);
+            }
+        }
+        
+        // Continue as guest
+        function continueAsGuest() {
+            // Set up guest mode
+            Auth.setupGuestMode();
+            Analytics.track('continue_as_guest', { source: 'web' });
+            window.location.href = 'index.html';
+        }
+        
+        // Password validation
+        function validatePassword() {
+            const password = document.getElementById('signupPassword').value;
+            
+            // Length
+            document.getElementById('reqLength').classList.toggle('valid', password.length >= 8);
+            
+            // Uppercase
+            document.getElementById('reqUpper').classList.toggle('valid', /[A-Z]/.test(password));
+            
+            // Lowercase
+            document.getElementById('reqLower').classList.toggle('valid', /[a-z]/.test(password));
+            
+            // Number
+            document.getElementById('reqNumber').classList.toggle('valid', /\d/.test(password));
+            
+            // Special character
+            document.getElementById('reqSpecial').classList.toggle('valid', /[^A-Za-z0-9]/.test(password));
+        }
+    </script>
+</body>
+</html>

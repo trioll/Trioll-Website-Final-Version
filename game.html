@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="gameTitle">Loading Game... - Trioll</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/game-player.css">
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script></head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <img src="https://raw.githubusercontent.com/trioll/Trioll/78458b29ad3b63aae3eff39aae462c0ad4cc4d8b/Logo/Trioll_Logo_White.png" alt="Trioll" height="40">
+            </a>
+            <div class="nav-right">
+                <a href="index.html" class="nav-link">Games</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="inventory.html" class="nav-link">Inventory</a>
+                <a href="achievements.html" class="nav-link">Achievements</a>
+                <span class="guest-indicator hidden"></span>
+                <button id="authBtn" class="auth-button">Login</button>
+                <div id="userMenu" class="user-menu hidden">
+                    <span id="username"></span>
+                    <button id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Game Header -->
+    <div class="game-header">
+        <button class="back-to-games" onclick="handleBackToGames()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 2px;">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+            Back to Games
+        </button>
+        <h1 id="gameNameHeader">Loading...</h1>
+    </div>
+
+    <!-- Pre-game Ad Slot -->
+    <div id="preGameAd" class="ad-container">
+        <!-- Future ad integration -->
+    </div>
+
+    <!-- Game Container -->
+    <div id="gameContainer" class="game-container">
+        <!-- Loading Screen -->
+        <div id="loadingScreen" class="loading-screen">
+            <div class="loader"></div>
+            <p>Loading game...</p>
+            <p id="loadingTip" class="loading-tip"></p>
+            <div class="loading-progress">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+        </div>
+        
+        <!-- Compatibility Error -->
+        <div id="compatError" class="compat-error hidden">
+            <h2>Game Not Compatible</h2>
+            <p id="compatMessage"></p>
+            <div id="compatIssues"></div>
+            <a href="index.html" class="btn">Browse Other Games</a>
+        </div>
+        
+        <!-- Game Wrapper -->
+        <div id="gameWrapper" class="game-wrapper hidden">
+            <!-- Dynamic content based on game engine -->
+        </div>
+    </div>
+
+    <!-- Game Actions -->
+    <div class="game-actions">
+        <button id="likeBtn" class="action-btn">
+            <span class="icon">❤️</span>
+            <span id="likeCount">0</span>
+        </button>
+        <button id="rateBtn" class="action-btn">
+            <span class="icon">⭐</span>
+            <span>Rate</span>
+        </button>
+        <button id="shareBtn" class="action-btn">
+            <span class="icon">🔗</span>
+            <span>Share</span>
+        </button>
+        <button id="fullscreenBtn" class="action-btn">
+            <span class="icon">⛶</span>
+            <span>Fullscreen</span>
+        </button>
+    </div>
+
+    <!-- Comments Section -->
+    <section class="comments-section" id="comments">
+        <div class="container">
+            <h2>Comments</h2>
+            
+            <!-- Add Comment Form -->
+            <div id="addCommentForm" class="comment-form">
+                <h3>Leave a Comment</h3>
+                <div class="rating-input">
+                    <label>Rating (optional):</label>
+                    <div class="comment-rating-stars">
+                        <span class="star" data-rating="1">⭐</span>
+                        <span class="star" data-rating="2">⭐</span>
+                        <span class="star" data-rating="3">⭐</span>
+                        <span class="star" data-rating="4">⭐</span>
+                        <span class="star" data-rating="5">⭐</span>
+                    </div>
+                </div>
+                <textarea id="commentText" placeholder="Share your thoughts about this game..." rows="4"></textarea>
+                <button class="btn btn-primary" onclick="postComment()">Post Comment</button>
+                <p class="comment-notice">Please login to comment</p>
+            </div>
+            
+            <!-- Comments List -->
+            <div id="commentsList" class="comments-list">
+                <div class="loading-comments">
+                    <div class="spinner"></div>
+                    <p>Loading comments...</p>
+                </div>
+            </div>
+            
+            <!-- Load More Button -->
+            <div id="loadMoreContainer" class="load-more-container hidden">
+                <button class="btn btn-secondary" onclick="loadMoreComments()">Load More Comments</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Purchase Intent Modal -->
+    <div id="purchaseModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closePurchaseModal()">&times;</span>
+            <h2>Enjoyed <span id="purchaseGameName">the game</span>?</h2>
+            <p>Would you like to buy the full version?</p>
+            <div class="purchase-buttons">
+                <button class="btn btn-primary" onclick="trackPurchaseIntent('yes')">Yes, I'm Interested!</button>
+                <button class="btn btn-secondary" onclick="trackPurchaseIntent('no')">No Thanks</button>
+                <button class="btn btn-tertiary" onclick="trackPurchaseIntent('askLater')">Ask Me Later</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating Modal -->
+    <div id="ratingModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeRatingModal()">&times;</span>
+            <h2>Rate This Game</h2>
+            <div class="rating-stars">
+                <span class="star" data-rating="1">⭐</span>
+                <span class="star" data-rating="2">⭐</span>
+                <span class="star" data-rating="3">⭐</span>
+                <span class="star" data-rating="4">⭐</span>
+                <span class="star" data-rating="5">⭐</span>
+            </div>
+            <button id="submitRating" class="btn btn-primary">Submit Rating</button>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/cognito-auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/init.js"></script>
+    <script src="js/gameLoader.js"></script>
+    <script src="js/compatibility.js"></script>
+    <script src="js/game-interactions.js"></script>
+    <script>
+        // Emergency fallback - if no game loads after 5 seconds, force it
+        setTimeout(() => {
+            const gameWrapper = document.getElementById('gameWrapper');
+            const hasIframe = gameWrapper && gameWrapper.querySelector('iframe');
+            
+            if (!hasIframe) {
+                Logger.log('🚨 EMERGENCY: No game loaded after 5 seconds, forcing load');
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const gameId = urlParams.get('id');
+                
+                if (gameId && gameWrapper) {
+                    // Hide everything else
+                    const loadingScreen = document.getElementById('loadingScreen');
+                    if (loadingScreen) {
+                        loadingScreen.style.display = 'none';
+                    }
+                    
+                    // Show game wrapper  
+                    gameWrapper.style.display = 'block';
+                    gameWrapper.classList.remove('hidden');
+                    gameWrapper.innerHTML = `
+                        <iframe 
+                            src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
+                            style="width: 100%; height: 100%; border: none;"
+                            allowfullscreen
+                            allow="accelerometer; gyroscope; autoplay"
+                        ></iframe>
+                    `;
+                    
+                    const gameName = gameId.replace(/-/g, ' ');
+                    document.title = gameName + ' - Trioll';
+                    
+                    const header = document.getElementById('gameNameHeader');
+                    if (header) {
+                        header.textContent = gameName;
+                    }
+                    
+                    // Set currentGame for the purchase intent popup
+                    window.currentGame = {
+                        id: gameId,
+                        name: gameName
+                    };
+                    
+                    // Track game start time
+                    window.gameStartTime = Date.now();
+                    
+                    Logger.log('✅ Emergency game load complete');
+                }
+            }
+        }, 5000);
+    </script>
+    <script>
+        // Make currentGame globally accessible
+        window.currentGame = window.currentGame || null;
+        let currentGame = window.currentGame;
+        let currentRating = 0;
+        let isLiked = false;
+        let currentCommentRating = 0;
+        let comments = [];
+        let commentsPage = 1;
+        let hasMoreComments = true;
+        
+        // Debug: Check if elements exist
+        Logger.log('🔍 Initial page check:', {
+            loadingScreen: document.getElementById('loadingScreen'),
+            gameWrapper: document.getElementById('gameWrapper'),
+            compatError: document.getElementById('compatError')
+        });
+        
+        // Get game ID from URL and load
+        window.addEventListener('trioll-initialized', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameId = urlParams.get('id');
+            
+            if (!gameId) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            
+            // Redirect to login if no session (neither authenticated nor guest)
+            if (!Auth.isAuthenticated() && !Auth.isGuest) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            try {
+                // Load game details
+                currentGame = await API.getGame(gameId);
+                window.currentGame = currentGame; // Make it globally accessible
+                
+                // Update page title and header
+                document.title = `${currentGame.name} - Play on Trioll`;
+                document.getElementById('gameNameHeader').textContent = currentGame.name;
+                
+                // Update stats
+                document.getElementById('likeCount').textContent = currentGame.likeCount || 0;
+                
+                // Check if user has liked
+                if (!Auth.isGuest) {
+                    const interactions = await API.getUserInteractions(gameId);
+                    isLiked = interactions.liked;
+                    updateLikeButton();
+                }
+                
+                // Load the game directly - simplified approach
+                Logger.log('🎮 Loading game:', gameId);
+                Logger.log('🎮 Current game data:', currentGame);
+                
+                // Hide loading screen and show game wrapper
+                const loadingScreen = document.getElementById('loadingScreen');
+                const gameWrapper = document.getElementById('gameWrapper');
+                
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.classList.add('hidden');
+                }
+                
+                if (gameWrapper) {
+                    gameWrapper.style.display = 'block';
+                    gameWrapper.classList.remove('hidden');
+                    
+                    // Create iframe directly (like working-game.html)
+                    // Use game URL if provided, otherwise construct from CDN
+                    let gameUrl = currentGame.gameUrl;
+                    if (!gameUrl) {
+                        const gameId = currentGame.id || currentGame.gameId;
+                        // Try new CDN first, fallback to legacy
+                        gameUrl = `${Config.GAME_CDN_URL}/${gameId}/index.html`;
+                    }
+                    
+                    Logger.log('🎮 Creating iframe with URL:', gameUrl);
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.src = gameUrl;
+                    iframe.style.width = '100%';
+                    iframe.style.height = '100%';
+                    iframe.style.border = 'none';
+                    iframe.setAttribute('allowfullscreen', '');
+                    iframe.setAttribute('allow', 'accelerometer; gyroscope; autoplay');
+                    
+                    // Clear any existing content
+                    gameWrapper.innerHTML = '';
+                    gameWrapper.appendChild(iframe);
+                    
+                    // Log when iframe loads
+                    iframe.onload = () => {
+                        Logger.log('✅ Game iframe loaded successfully');
+                        // Track when game actually starts playing
+                        window.gameStartTime = Date.now();
+                    };
+                    
+                    iframe.onerror = (error) => {
+                        Logger.error('❌ Game iframe failed to load:', error);
+                        // Try legacy CDN as fallback
+                        if (gameUrl.includes(Config.GAME_CDN_URL)) {
+                            Logger.log('Trying legacy CDN...');
+                            const gameId = currentGame.id || currentGame.gameId;
+                            iframe.src = `${Config.LEGACY_CDN_URL}/${gameId}/index.html`;
+                        }
+                    };
+                }
+                
+                // Track game play
+                await API.trackPlay(gameId);
+                API.trackLocalActivity('play', gameId, { gameName: currentGame.name });
+                
+                // Update play count
+                const currentPlays = parseInt(localStorage.getItem('trioll_games_played') || '0');
+                localStorage.setItem('trioll_games_played', (currentPlays + 1).toString());
+                
+                // Add to recent games
+                const recentGames = JSON.parse(localStorage.getItem('trioll_recent_games') || '[]');
+                const gameData = {
+                    id: currentGame.id || currentGame.gameId,
+                    gameId: currentGame.id || currentGame.gameId,
+                    name: currentGame.name,
+                    developerName: currentGame.developerName,
+                    thumbnailUrl: currentGame.thumbnailUrl,
+                    playedAt: Date.now()
+                };
+                
+                // Remove if already in recent (to avoid duplicates)
+                const filtered = recentGames.filter(g => g.id !== gameData.id);
+                filtered.push(gameData);
+                
+                // Keep only last 50 recent games
+                if (filtered.length > 50) {
+                    filtered.splice(0, filtered.length - 50);
+                }
+                
+                localStorage.setItem('trioll_recent_games', JSON.stringify(filtered));
+                
+                // Setup action buttons
+                setupActionButtons();
+                
+                // Setup auth button
+                document.getElementById('authBtn').addEventListener('click', () => {
+                    if (Auth.isGuest) {
+                        localStorage.removeItem('trioll_guest_active');
+                        window.location.href = 'login.html';
+                    } else {
+                        window.location.href = 'login.html';
+                    }
+                });
+                
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    Auth.signOut();
+                    window.location.href = 'login.html';
+                });
+                
+                // Load comments
+                await loadComments();
+                
+                // Setup comment form
+                setupCommentForm();
+                
+                // Purchase intent will show when user navigates back
+                // setTimeout(showPurchaseModal, 120000);
+                
+            } catch (error) {
+                Logger.error('Failed to load game:', error);
+                showError('Failed to load game. Please try again.');
+            }
+        });
+        
+        function setupActionButtons() {
+            // Like button
+            document.getElementById('likeBtn').addEventListener('click', async () => {
+                if (Auth.isGuest) {
+                    alert('Please login to like games');
+                    return;
+                }
+                
+                try {
+                    if (isLiked) {
+                        await API.unlikeGame(currentGame.id);
+                        isLiked = false;
+                        currentGame.likeCount--;
+                    } else {
+                        await API.likeGame(currentGame.id);
+                        isLiked = true;
+                        currentGame.likeCount++;
+                    }
+                    
+                    updateLikeButton();
+                    
+                    Analytics.track('game_like', {
+                        gameId: currentGame.id,
+                        action: isLiked ? 'like' : 'unlike',
+                        source: 'web'
+                    });
+                } catch (error) {
+                    Logger.error('Failed to update like:', error);
+                }
+            });
+            
+            // Rate button
+            document.getElementById('rateBtn').addEventListener('click', () => {
+                document.getElementById('ratingModal').classList.remove('hidden');
+            });
+            
+            // Share button
+            document.getElementById('shareBtn').addEventListener('click', () => {
+                const url = window.location.href;
+                if (navigator.share) {
+                    navigator.share({
+                        title: currentGame.name,
+                        text: `Check out ${currentGame.name} on Trioll!`,
+                        url: url
+                    });
+                } else {
+                    // Fallback - copy to clipboard
+                    navigator.clipboard.writeText(url);
+                    alert('Link copied to clipboard!');
+                }
+                
+                Analytics.track('game_share', {
+                    gameId: currentGame.id,
+                    method: navigator.share ? 'native' : 'clipboard',
+                    source: 'web'
+                });
+            });
+            
+            // Setup rating stars
+            document.querySelectorAll('.star').forEach(star => {
+                star.addEventListener('click', (e) => {
+                    currentRating = parseInt(e.target.dataset.rating);
+                    updateStarDisplay();
+                });
+            });
+            
+            document.getElementById('submitRating').addEventListener('click', submitRating);
+        }
+        
+        function updateLikeButton() {
+            const likeBtn = document.getElementById('likeBtn');
+            if (isLiked) {
+                likeBtn.classList.add('liked');
+            } else {
+                likeBtn.classList.remove('liked');
+            }
+            document.getElementById('likeCount').textContent = currentGame.likeCount || 0;
+        }
+        
+        function updateStarDisplay() {
+            document.querySelectorAll('.star').forEach((star, index) => {
+                if (index < currentRating) {
+                    star.classList.add('filled');
+                } else {
+                    star.classList.remove('filled');
+                }
+            });
+        }
+        
+        async function submitRating() {
+            if (currentRating === 0) {
+                alert('Please select a rating');
+                return;
+            }
+            
+            if (Auth.isGuest) {
+                alert('Please login to rate games');
+                return;
+            }
+            
+            try {
+                await API.rateGame(currentGame.id, currentRating);
+                closeRatingModal();
+                
+                Analytics.track('game_rate', {
+                    gameId: currentGame.id,
+                    rating: currentRating,
+                    source: 'web'
+                });
+                
+                alert('Thanks for rating!');
+            } catch (error) {
+                Logger.error('Failed to submit rating:', error);
+                alert('Failed to submit rating. Please try again.');
+            }
+        }
+        
+        function showPurchaseModal() {
+            document.getElementById('purchaseModal').classList.remove('hidden');
+        }
+        
+        function closePurchaseModal() {
+            document.getElementById('purchaseModal').classList.add('hidden');
+        }
+        
+        function closeRatingModal() {
+            document.getElementById('ratingModal').classList.add('hidden');
+        }
+        
+        async function trackPurchaseIntent(intent) {
+            closePurchaseModal();
+            
+            try {
+                await API.trackPurchaseIntent(currentGame.id, intent);
+                
+                Analytics.track('purchase_intent', {
+                    gameId: currentGame.id,
+                    intent: intent,
+                    source: 'web'
+                });
+                
+                if (intent === 'yes' && currentGame.purchaseUrl) {
+                    // Redirect to purchase with tracking
+                    window.open(
+                        `${currentGame.purchaseUrl}?ref=trioll&platform=pc`,
+                        '_blank'
+                    );
+                } else if (intent !== 'askLater') {
+                    // If they said no or yes without purchase URL, go back to games
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 500);
+                } else {
+                    // Ask later - just go back
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                Logger.error('Failed to track purchase intent:', error);
+                // Still navigate back on error
+                window.location.href = 'index.html';
+            }
+        }
+        
+        function handleBackToGames() {
+            // Always show purchase intent popup when leaving a game (for testing)
+            // You can add the timer back later by uncommenting the duration check
+            
+            // const gameStartTime = window.gameStartTime || Date.now();
+            // const playDuration = (Date.now() - gameStartTime) / 1000; // in seconds
+            
+            // Show purchase intent if not already shown for this game
+            if (currentGame && !window.purchaseIntentShown) {
+                window.purchaseIntentShown = true; // Prevent showing multiple times
+                
+                // Update modal with game name
+                document.getElementById('purchaseGameName').textContent = currentGame.name;
+                
+                // Show the purchase intent modal
+                showPurchaseModal();
+            } else {
+                // Just go back if already shown or no game loaded
+                window.location.href = 'index.html';
+            }
+        }
+        
+        function showError(message) {
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('compatError').classList.remove('hidden');
+            document.getElementById('compatMessage').textContent = message;
+        }
+        
+        // Comment Functions
+        function setupCommentForm() {
+            // Update form visibility based on auth state
+            const form = document.getElementById('addCommentForm');
+            const notice = form.querySelector('.comment-notice');
+            const textarea = form.querySelector('textarea');
+            const button = form.querySelector('button');
+            
+            if (Auth.isAuthenticated() || Auth.isGuest) {
+                notice.style.display = 'none';
+                textarea.disabled = false;
+                button.disabled = false;
+            } else {
+                notice.style.display = 'block';
+                textarea.disabled = true;
+                button.disabled = true;
+            }
+            
+            // Setup rating stars for comments
+            document.querySelectorAll('.comment-rating-stars .star').forEach(star => {
+                star.addEventListener('click', (e) => {
+                    currentCommentRating = parseInt(e.target.dataset.rating);
+                    updateCommentStarDisplay();
+                });
+            });
+        }
+        
+        function updateCommentStarDisplay() {
+            document.querySelectorAll('.comment-rating-stars .star').forEach((star, index) => {
+                if (index < currentCommentRating) {
+                    star.classList.add('filled');
+                } else {
+                    star.classList.remove('filled');
+                }
+            });
+        }
+        
+        async function loadComments() {
+            try {
+                const response = await fetch(`${Config.API_BASE_URL}/games/${currentGame.id}/comments?page=${commentsPage}&limit=10`, {
+                    headers: await API.getHeaders()
+                });
+                
+                if (!response.ok) throw new Error('Failed to load comments');
+                
+                const data = await response.json();
+                const newComments = data.comments || [];
+                hasMoreComments = data.hasMore || false;
+                
+                if (commentsPage === 1) {
+                    comments = newComments;
+                    displayComments();
+                } else {
+                    comments = [...comments, ...newComments];
+                    appendComments(newComments);
+                }
+                
+                // Show/hide load more button
+                document.getElementById('loadMoreContainer').classList.toggle('hidden', !hasMoreComments);
+                
+                // Track web-specific comment view
+                Analytics.track('comments_viewed', {
+                    gameId: currentGame.id,
+                    page: commentsPage,
+                    count: newComments.length,
+                    source: 'web',
+                    platform: 'browser'
+                });
+            } catch (error) {
+                Logger.error('Failed to load comments:', error);
+                document.getElementById('commentsList').innerHTML = '<p class="error-message">Failed to load comments</p>';
+            }
+        }
+        
+        function displayComments() {
+            const container = document.getElementById('commentsList');
+            
+            if (comments.length === 0) {
+                container.innerHTML = '<p class="no-comments">No comments yet. Be the first to share your thoughts!</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            comments.forEach(comment => {
+                container.appendChild(createCommentElement(comment));
+            });
+        }
+        
+        function appendComments(newComments) {
+            const container = document.getElementById('commentsList');
+            newComments.forEach(comment => {
+                container.appendChild(createCommentElement(comment));
+            });
+        }
+        
+        function createCommentElement(comment) {
+            const div = document.createElement('div');
+            div.className = 'comment-item';
+            
+            const ratingStars = comment.rating ? '⭐'.repeat(comment.rating) : '';
+            const timeAgo = getRelativeTime(new Date(comment.timestamp));
+            const userName = comment.userName || 'Anonymous';
+            const isOwner = comment.userId === Auth.getCurrentUserId();
+            
+            div.innerHTML = `
+                <div class="comment-header">
+                    <span class="comment-author">${userName}</span>
+                    ${ratingStars ? `<span class="comment-rating">${ratingStars}</span>` : ''}
+                    <span class="comment-time">${timeAgo}</span>
+                </div>
+                <p class="comment-text">${escapeHtml(comment.text)}</p>
+                <div class="comment-actions">
+                    <button class="comment-like-btn ${comment.userLiked ? 'liked' : ''}" onclick="likeComment('${comment.commentId}')">
+                        👍 ${comment.likes || 0}
+                    </button>
+                    ${isOwner ? `
+                        <button class="comment-edit-btn" onclick="editComment('${comment.commentId}')">Edit</button>
+                        <button class="comment-delete-btn" onclick="deleteComment('${comment.commentId}')">Delete</button>
+                    ` : ''}
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        async function postComment() {
+            const text = document.getElementById('commentText').value.trim();
+            
+            if (!text) {
+                alert('Please write a comment');
+                return;
+            }
+            
+            if (!Auth.isAuthenticated() && !Auth.isGuest) {
+                alert('Please login to comment');
+                return;
+            }
+            
+            try {
+                const commentData = {
+                    text,
+                    rating: currentCommentRating || undefined,
+                    platform: 'pc' // Track as web comment
+                };
+                
+                const response = await fetch(`${Config.API_BASE_URL}/games/${currentGame.id}/comments`, {
+                    method: 'POST',
+                    headers: await API.getHeaders(),
+                    body: JSON.stringify(commentData)
+                });
+                
+                if (!response.ok) throw new Error('Failed to post comment');
+                
+                // Clear form
+                document.getElementById('commentText').value = '';
+                currentCommentRating = 0;
+                updateCommentStarDisplay();
+                
+                // Reload comments
+                commentsPage = 1;
+                await loadComments();
+                
+                // Track web-specific comment post
+                Analytics.track('comment_posted', {
+                    gameId: currentGame.id,
+                    hasRating: !!currentCommentRating,
+                    rating: currentCommentRating,
+                    source: 'web',
+                    platform: 'browser'
+                });
+                
+                alert('Comment posted successfully!');
+            } catch (error) {
+                Logger.error('Failed to post comment:', error);
+                alert('Failed to post comment. Please try again.');
+            }
+        }
+        
+        async function loadMoreComments() {
+            commentsPage++;
+            await loadComments();
+        }
+        
+        async function likeComment(commentId) {
+            if (Auth.isGuest) {
+                alert('Please login to like comments');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${Config.API_BASE_URL}/comments/${commentId}/like`, {
+                    method: 'PUT',
+                    headers: await API.getHeaders()
+                });
+                
+                if (response.ok) {
+                    // Update local state
+                    const comment = comments.find(c => c.commentId === commentId);
+                    if (comment) {
+                        comment.userLiked = !comment.userLiked;
+                        comment.likes = (comment.likes || 0) + (comment.userLiked ? 1 : -1);
+                    }
+                    
+                    // Refresh display
+                    displayComments();
+                    
+                    // Track web-specific comment like
+                    Analytics.track('comment_liked', {
+                        commentId,
+                        source: 'web',
+                        platform: 'browser'
+                    });
+                }
+            } catch (error) {
+                Logger.error('Failed to like comment:', error);
+            }
+        }
+        
+        async function deleteComment(commentId) {
+            if (!confirm('Delete this comment?')) return;
+            
+            try {
+                const response = await fetch(`${Config.API_BASE_URL}/comments/${commentId}`, {
+                    method: 'DELETE',
+                    headers: await API.getHeaders()
+                });
+                
+                if (response.ok) {
+                    comments = comments.filter(c => c.commentId !== commentId);
+                    displayComments();
+                    
+                    // Track web-specific comment delete
+                    Analytics.track('comment_deleted', {
+                        commentId,
+                        source: 'web',
+                        platform: 'browser'
+                    });
+                }
+            } catch (error) {
+                Logger.error('Failed to delete comment:', error);
+            }
+        }
+        
+        function editComment(commentId) {
+            // In a real app, would show edit form
+            alert('Edit functionality coming soon!');
+        }
+        
+        function getRelativeTime(date) {
+            const seconds = Math.floor((Date.now() - date) / 1000);
+            if (seconds < 60) return 'just now';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + ' min ago';
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + ' hours ago';
+            const days = Math.floor(hours / 24);
+            return days + ' days ago';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
