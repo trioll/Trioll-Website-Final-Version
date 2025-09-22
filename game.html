@@ -357,6 +357,39 @@
             }
         }
         
+        // Function to sync local ratings to backend
+        async function syncLocalRatings() {
+            const localRatings = JSON.parse(localStorage.getItem('trioll_game_ratings') || '{}');
+            const gameIds = Object.keys(localRatings);
+            
+            if (gameIds.length === 0) return;
+            
+            Logger.log('Syncing local ratings to backend:', gameIds.length, 'games');
+            
+            let syncedCount = 0;
+            for (const gameId of gameIds) {
+                try {
+                    await API.rateGame(gameId, localRatings[gameId]);
+                    syncedCount++;
+                    // Remove from local storage after successful sync
+                    delete localRatings[gameId];
+                } catch (error) {
+                    Logger.warn('Failed to sync rating for game:', gameId);
+                }
+            }
+            
+            // Update local storage with remaining unsynced ratings
+            if (Object.keys(localRatings).length > 0) {
+                localStorage.setItem('trioll_game_ratings', JSON.stringify(localRatings));
+            } else {
+                localStorage.removeItem('trioll_game_ratings');
+            }
+            
+            if (syncedCount > 0) {
+                Logger.log(`Successfully synced ${syncedCount} ratings to backend`);
+            }
+        }
+        
         // Debug: Check if elements exist
         Logger.log('🔍 Initial page check:', {
             loadingScreen: document.getElementById('loadingScreen'),
@@ -381,9 +414,10 @@
                 return;
             }
             
-            // Try to sync local likes if authenticated
+            // Try to sync local data if authenticated
             if (Auth.isAuthenticated()) {
                 syncLocalLikes().catch(err => Logger.warn('Failed to sync likes:', err));
+                syncLocalRatings().catch(err => Logger.warn('Failed to sync ratings:', err));
             }
             
             try {
@@ -639,14 +673,25 @@
                             url: url
                         });
                         
-                        Analytics.track('game_share', {
+                        const shareData = {
                             gameId: currentGame.id,
                             gameName: currentGame.name,
                             method: 'native',
                             source: 'web',
                             platform: 'pc',
-                            device: Analytics.getDeviceType()
-                        });
+                            device: Analytics.getDeviceType(),
+                            isGuest: Auth.isGuest || false,
+                            userId: Auth.getCurrentUserId() || Auth.getGuestId() || 'anonymous'
+                        };
+                        
+                        Analytics.track('game_share', shareData);
+                        
+                        if (Auth.isGuest) {
+                            Analytics.track('guest_game_interaction', {
+                                ...shareData,
+                                interactionType: 'share'
+                            });
+                        }
                     } catch (error) {
                         // User cancelled share
                         if (error.name !== 'AbortError') {
@@ -659,14 +704,25 @@
                         await navigator.clipboard.writeText(url);
                         alert('Link copied to clipboard!');
                         
-                        Analytics.track('game_share', {
+                        const shareData = {
                             gameId: currentGame.id,
                             gameName: currentGame.name,
                             method: 'clipboard',
                             source: 'web',
                             platform: 'pc',
-                            device: Analytics.getDeviceType()
-                        });
+                            device: Analytics.getDeviceType(),
+                            isGuest: Auth.isGuest || false,
+                            userId: Auth.getCurrentUserId() || Auth.getGuestId() || 'anonymous'
+                        };
+                        
+                        Analytics.track('game_share', shareData);
+                        
+                        if (Auth.isGuest) {
+                            Analytics.track('guest_game_interaction', {
+                                ...shareData,
+                                interactionType: 'share'
+                            });
+                        }
                     } catch (error) {
                         Logger.error('Copy to clipboard failed:', error);
                         // Fallback fallback - select and copy
@@ -710,13 +766,25 @@
                     
                     if (requestFullscreen) {
                         requestFullscreen.call(iframe).then(() => {
-                            Analytics.track('game_fullscreen_enter', {
+                            const fullscreenData = {
                                 gameId: currentGame.id,
                                 gameName: currentGame.name,
                                 source: 'web',
                                 platform: 'pc',
-                                device: Analytics.getDeviceType()
-                            });
+                                device: Analytics.getDeviceType(),
+                                isGuest: Auth.isGuest || false,
+                                userId: Auth.getCurrentUserId() || Auth.getGuestId() || 'anonymous',
+                                action: 'enter'
+                            };
+                            
+                            Analytics.track('game_fullscreen_enter', fullscreenData);
+                            
+                            if (Auth.isGuest) {
+                                Analytics.track('guest_game_interaction', {
+                                    ...fullscreenData,
+                                    interactionType: 'fullscreen'
+                                });
+                            }
                         }).catch(err => {
                             Logger.error('Failed to enter fullscreen:', err);
                             alert('Fullscreen not available');
@@ -783,23 +851,44 @@
             }
             
             // Allow guests to rate on web platform
-            // if (Auth.isGuest) {
-            //     alert('Please login to rate games');
-            //     return;
-            // }
-            
             try {
-                await API.rateGame(currentGame.id, currentRating);
+                // Try to save rating to backend
+                try {
+                    await API.rateGame(currentGame.id, currentRating);
+                } catch (apiError) {
+                    Logger.warn('API rating failed, storing locally:', apiError);
+                }
+                
+                // Store rating locally
+                const localRatings = JSON.parse(localStorage.getItem('trioll_game_ratings') || '{}');
+                localRatings[currentGame.id] = currentRating;
+                localStorage.setItem('trioll_game_ratings', JSON.stringify(localRatings));
+                
                 closeRatingModal();
                 
-                Analytics.track('game_rate', {
+                // Track analytics for all users including guests
+                const analyticsData = {
                     gameId: currentGame.id,
                     gameName: currentGame.name,
                     rating: currentRating,
                     source: 'web',
                     platform: 'pc',
-                    device: Analytics.getDeviceType()
-                });
+                    device: Analytics.getDeviceType(),
+                    isGuest: Auth.isGuest || false,
+                    userId: Auth.getCurrentUserId() || Auth.getGuestId() || 'anonymous',
+                    localStorage: true,
+                    timestamp: Date.now()
+                };
+                
+                Analytics.track('game_rate', analyticsData);
+                
+                // Track guest-specific event
+                if (Auth.isGuest) {
+                    Analytics.track('guest_game_interaction', {
+                        ...analyticsData,
+                        interactionType: 'rating'
+                    });
+                }
                 
                 alert('Thanks for rating!');
             } catch (error) {
