@@ -24,6 +24,9 @@ class GoogleAuthService {
             this.initialized = true;
             Logger.log('✅ Google Sign-In initialized');
             
+            // Dispatch custom event when initialized
+            window.dispatchEvent(new CustomEvent('google-signin-ready'));
+            
         } catch (error) {
             Logger.error('Failed to initialize Google Sign-In:', error);
             throw error;
@@ -95,8 +98,8 @@ class GoogleAuthService {
                 });
             }
             
-            // Reload the page to show authenticated state
-            window.location.reload();
+            // Redirect to games page after successful login
+            window.location.href = 'games.html';
             
         } catch (error) {
             Logger.error('Google Sign-In failed:', error);

@@ -233,36 +233,43 @@
         
         // Initialize
         // Setup Google Sign-In
+        function renderGoogleButtons() {
+            if (window.GoogleAuth && GoogleAuth.initialized) {
+                // Render button in login form
+                GoogleAuth.renderButton('google-signin-button', {
+                    theme: 'filled_blue',
+                    size: 'large',
+                    text: 'signin_with',
+                    width: 280
+                });
+                
+                // Render button in signup form
+                GoogleAuth.renderButton('google-signin-button-signup', {
+                    theme: 'filled_blue',
+                    size: 'large',
+                    text: 'signup_with',
+                    width: 280
+                });
+                
+                Logger.log('Google Sign-In buttons rendered');
+            } else {
+                Logger.warn('Google Sign-In not initialized');
+            }
+        }
+        
+        // Try to render on load
         window.addEventListener('load', () => {
-            // Wait for Google Sign-In to initialize
-            setTimeout(() => {
-                if (window.GoogleAuth && GoogleAuth.isInitialized) {
-                    // Render button in login form
-                    GoogleAuth.renderButton('google-signin-button', {
-                        theme: 'filled_blue',
-                        size: 'large',
-                        text: 'signin_with',
-                        width: 280
-                    });
-                    
-                    // Render button in signup form
-                    GoogleAuth.renderButton('google-signin-button-signup', {
-                        theme: 'filled_blue',
-                        size: 'large',
-                        text: 'signup_with',
-                        width: 280
-                    });
-                } else {
-                    Logger.warn('Google Sign-In not initialized. Please configure GOOGLE_CLIENT_ID in config.js');
-                }
-            }, 1000);
+            setTimeout(renderGoogleButtons, 1000);
         });
+        
+        // Also render when Google Sign-In is ready
+        window.addEventListener('google-signin-ready', renderGoogleButtons);
         
         window.addEventListener('trioll-initialized', async () => {
             
             // Check if already logged in or has active guest session
             if (Auth.isAuthenticated() || Auth.isGuest) {
-                window.location.href = 'index.html';
+                window.location.href = 'games.html';
                 return;
             }
             
@@ -387,7 +394,7 @@
                 }
                 
                 Analytics.track('user_login', { method: 'email', source: 'web' });
-                window.location.href = 'index.html';
+                window.location.href = 'games.html';
             } else {
                 // Check if account needs confirmation
                 if (result.needsConfirmation) {
@@ -537,7 +544,7 @@
             // Set up guest mode
             Auth.setupGuestMode();
             Analytics.track('continue_as_guest', { source: 'web' });
-            window.location.href = 'index.html';
+            window.location.href = 'games.html';
         }
         
         // Password validation
