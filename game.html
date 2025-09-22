@@ -360,9 +360,9 @@
                 // Update stats
                 document.getElementById('likeCount').textContent = currentGame.likeCount || 0;
                 
-                // Check if user has liked - skip for now as endpoint may not exist
-                // Will track locally for session
-                isLiked = false;
+                // Check if user has liked - check local storage
+                const likedGames = JSON.parse(localStorage.getItem('trioll_liked_games') || '{}');
+                isLiked = likedGames[gameId] || false;
                 updateLikeButton();
                 
                 // Load the game directly - simplified approach
@@ -525,15 +525,33 @@
                 // }
                 
                 try {
+                    // Try API call first
                     if (isLiked) {
-                        await API.unlikeGame(currentGame.id);
+                        try {
+                            await API.unlikeGame(currentGame.id);
+                        } catch (apiError) {
+                            Logger.warn('API unlike failed, using local storage:', apiError);
+                        }
                         isLiked = false;
                         currentGame.likeCount--;
                     } else {
-                        await API.likeGame(currentGame.id);
+                        try {
+                            await API.likeGame(currentGame.id);
+                        } catch (apiError) {
+                            Logger.warn('API like failed, using local storage:', apiError);
+                        }
                         isLiked = true;
                         currentGame.likeCount++;
                     }
+                    
+                    // Store likes locally for persistence
+                    const likedGames = JSON.parse(localStorage.getItem('trioll_liked_games') || '{}');
+                    if (isLiked) {
+                        likedGames[currentGame.id] = true;
+                    } else {
+                        delete likedGames[currentGame.id];
+                    }
+                    localStorage.setItem('trioll_liked_games', JSON.stringify(likedGames));
                     
                     updateLikeButton();
                     
@@ -547,7 +565,7 @@
                     });
                 } catch (error) {
                     Logger.error('Failed to update like:', error);
-                    alert('Failed to update like: ' + error.message);
+                    // Don't show alert - we handled it gracefully with local storage
                 }
             });
             
