@@ -1,0 +1,13 @@
+{
+  "name": "trioll-custom-authorizer",
+  "version": "1.0.0",
+  "description": "Custom authorizer for Trioll API Gateway - handles both Cognito and Guest tokens",
+  "main": "custom-authorizer.js",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

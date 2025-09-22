@@ -1,0 +1,5 @@
+{
+  "type": "TOKEN",
+  "methodArn": "arn:aws:execute-api:us-east-1:561645284740:4ib0hvu1xj/prod/POST/analytics/events",
+  "authorizationToken": "Bearer guest-test123_web_user"
+}
