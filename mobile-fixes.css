@@ -1,0 +1,198 @@
+/* Essential Mobile Fixes for TRIOLL Landing Page */
+
+/* Viewport meta tag reminder: Add to index.html
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+*/
+
+/* Mobile Navigation */
+@media (max-width: 768px) {
+    /* Header */
+    .header {
+        padding: 15px 20px;
+    }
+    
+    .nav {
+        display: none; /* Will need mobile menu implementation */
+    }
+    
+    /* Hero Section */
+    .hero-content {
+        padding: 40px 20px;
+    }
+    
+    .hero-content h1 {
+        font-size: clamp(32px, 8vw, 48px);
+    }
+    
+    /* Buttons */
+    .cta-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .cta-primary, .cta-secondary {
+        width: 100%;
+        max-width: 300px;
+    }
+}
+
+/* Team Section Fix - Critical for mobile */
+@media (max-width: 768px) {
+    /* Reset team section for mobile */
+    section:has(.team-content) {
+        padding: 60px 20px !important;
+        overflow-x: hidden;
+    }
+    
+    /* Team grid - force single column */
+    .team-content {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 40px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+    
+    /* Team member cards */
+    .team-member {
+        width: 100% !important;
+        max-width: 320px !important;
+        padding: 30px 20px !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+        text-align: center !important;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Team member images */
+    .team-member img {
+        width: 150px !important;
+        height: 150px !important;
+        border-radius: 50%;
+        margin: 0 auto 20px !important;
+        display: block;
+        object-fit: cover;
+        border: 3px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Team member text */
+    .team-member h3 {
+        font-size: 24px !important;
+        margin: 0 0 10px 0 !important;
+    }
+    
+    .team-member .role {
+        font-size: 16px !important;
+        opacity: 0.7;
+        margin: 0 0 15px 0 !important;
+    }
+    
+    .team-member p {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    /* Remove hover effects on mobile */
+    .team-member:hover {
+        transform: none !important;
+    }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+    /* Even smaller team images */
+    .team-member img {
+        width: 120px !important;
+        height: 120px !important;
+    }
+    
+    .team-member {
+        max-width: 280px !important;
+        padding: 20px 15px !important;
+    }
+    
+    .team-member h3 {
+        font-size: 20px !important;
+    }
+    
+    .team-member p {
+        font-size: 13px !important;
+    }
+    
+    /* Feature cards */
+    .feature-card {
+        padding: 30px 20px;
+        margin: 0 10px;
+    }
+    
+    /* Section spacing */
+    section {
+        padding: 40px 20px;
+    }
+    
+    h2 {
+        font-size: 28px !important;
+    }
+}
+
+/* iPhone SE and very small screens */
+@media (max-width: 375px) {
+    .team-member {
+        max-width: calc(100vw - 40px) !important;
+    }
+    
+    .team-member img {
+        width: 100px !important;
+        height: 100px !important;
+    }
+}
+
+/* Ensure no horizontal scroll */
+@media (max-width: 768px) {
+    body {
+        overflow-x: hidden !important;
+    }
+    
+    .wrapper, main, section {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Fix buttons and CTAs for mobile */
+@media (max-width: 768px) {
+    button, .button, .cta-button {
+        min-height: 44px; /* Apple's touch target recommendation */
+        min-width: 44px;
+    }
+    
+    /* Fixed position elements */
+    .fixed-cta {
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        font-size: 14px;
+    }
+}
+
+/* Modal adjustments for mobile */
+@media (max-width: 768px) {
+    .modal-content {
+        margin: 20px;
+        padding: 30px 20px;
+        width: calc(100% - 40px);
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+    }
+    
+    .modal-close {
+        top: 10px;
+        right: 10px;
+    }
+}
