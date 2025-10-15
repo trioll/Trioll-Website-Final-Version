@@ -392,18 +392,20 @@
                     // Show game wrapper  
                     gameWrapper.style.display = 'block';
                     gameWrapper.classList.remove('hidden');
-                    // Just load the game directly - emergency loader shouldn't do API calls
-                    // For new games, the main loader should handle them properly
-                    // This is just a fallback for when main loader fails
-                    gameWrapper.innerHTML = `
-                        <iframe 
-                            id="gameIframe"
-                            src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
-                            style="width: 100%; height: 100%; border: none;"
-                            allowfullscreen
-                            allow="accelerometer; gyroscope; autoplay"
-                        ></iframe>
+                    // Emergency loader disabled - main loader handles all cases now
+                    Logger.log('⏭️ Emergency loader skipped - main loader has proper fallback');
+                    // The main loader with API fallback should handle this
+                    // If we reach here, something is seriously wrong
+                    const errorMsg = document.createElement('div');
+                    errorMsg.style.padding = '20px';
+                    errorMsg.style.textAlign = 'center';
+                    errorMsg.innerHTML = `
+                        <h3>Game Loading Issue</h3>
+                        <p>The game is taking longer than expected to load.</p>
+                        <p>Please refresh the page or try again later.</p>
+                        <button onclick="window.location.reload()">Refresh Page</button>
                     `;
+                    gameWrapper.appendChild(errorMsg);
                     
                     const gameName = gameId.replace(/-/g, ' ');
                     document.title = gameName + ' - Trioll';
