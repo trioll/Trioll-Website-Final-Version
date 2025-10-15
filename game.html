@@ -724,8 +724,14 @@
                         let gameUrl;
                         if (useNewCDN && gameId.includes('-v')) {
                             // Handle versioned game names like "deep-miner-v3-1760530951535"
-                            const baseName = gameId.substring(0, gameId.lastIndexOf('-v')).replace(/-/g, '_');
-                            gameUrl = `${cdnDomain}/${gameId}/${baseName}_game.html`;
+                            // Extract base name up to version number
+                            const versionMatch = gameId.match(/^(.+?)-v\d+/);
+                            if (versionMatch) {
+                                const baseName = versionMatch[1].replace(/-/g, '_');
+                                gameUrl = `${cdnDomain}/${gameId}/${baseName}_game.html`;
+                            } else {
+                                gameUrl = `${cdnDomain}/${gameId}/index.html`;
+                            }
                         } else {
                             gameUrl = `${cdnDomain}/${gameId}/index.html`;
                         }
@@ -741,12 +747,27 @@
                         iframe.setAttribute('allowfullscreen', '');
                         iframe.setAttribute('allow', 'accelerometer; gyroscope; autoplay');
                         
+                        let loadTimeout;
+                        
                         iframe.onload = () => {
+                            clearTimeout(loadTimeout);
                             Logger.log('✅ Game loaded successfully from', useNewCDN ? 'new' : 'legacy', 'CDN');
                             window.gameStartTime = Date.now();
+                            
+                            // Check if iframe actually loaded content
+                            try {
+                                // This will throw if cross-origin
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                if (iframeDoc.body && iframeDoc.body.innerHTML.includes('AccessDenied')) {
+                                    throw new Error('Access Denied');
+                                }
+                            } catch (e) {
+                                // Cross-origin, assume it loaded OK
+                            }
                         };
                         
-                        iframe.onerror = () => {
+                        const handleLoadError = () => {
+                            clearTimeout(loadTimeout);
                             Logger.error('❌ Failed to load from', useNewCDN ? 'new' : 'legacy', 'CDN');
                             if (attempts === 1) {
                                 // Try legacy CDN
@@ -756,6 +777,16 @@
                                 showError('Failed to load game. The game may not be available.');
                             }
                         };
+                        
+                        iframe.onerror = handleLoadError;
+                        
+                        // Set timeout as iframe.onerror doesn't fire for 403s
+                        loadTimeout = setTimeout(() => {
+                            if (attempts === 1) {
+                                Logger.log('⏱️ Timeout, trying fallback CDN');
+                                handleLoadError();
+                            }
+                        }, 3000);
                         
                         gameWrapper.innerHTML = '';
                         gameWrapper.appendChild(iframe);
