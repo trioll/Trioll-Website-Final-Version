@@ -392,20 +392,62 @@
                     // Show game wrapper  
                     gameWrapper.style.display = 'block';
                     gameWrapper.classList.remove('hidden');
-                    // Emergency loader disabled - main loader handles all cases now
-                    Logger.log('⏭️ Emergency loader skipped - main loader has proper fallback');
-                    // The main loader with API fallback should handle this
-                    // If we reach here, something is seriously wrong
-                    const errorMsg = document.createElement('div');
-                    errorMsg.style.padding = '20px';
-                    errorMsg.style.textAlign = 'center';
-                    errorMsg.innerHTML = `
-                        <h3>Game Loading Issue</h3>
-                        <p>The game is taking longer than expected to load.</p>
-                        <p>Please refresh the page or try again later.</p>
-                        <button onclick="window.location.reload()">Refresh Page</button>
-                    `;
-                    gameWrapper.appendChild(errorMsg);
+                    // Emergency loader - try to fetch game data and load with correct URL
+                    Logger.log('🚨 Emergency loader activated - attempting to load game');
+                    
+                    // Try to fetch game from list API
+                    fetch(`https://4ib0hvu1xj.execute-api.us-east-1.amazonaws.com/prod/games?limit=100`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const game = data.games.find(g => g.id === gameId);
+                            if (game) {
+                                const gameUrl = game.gameUrl || game.trialUrl || `https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html`;
+                                Logger.log('🎮 Emergency: Loading game from URL:', gameUrl);
+                                
+                                gameWrapper.innerHTML = `
+                                    <iframe 
+                                        id="gameIframe"
+                                        src="${gameUrl}"
+                                        style="width: 100%; height: 100%; border: none;"
+                                        allowfullscreen
+                                        allow="accelerometer; gyroscope; autoplay"
+                                    ></iframe>
+                                `;
+                                
+                                // Update game info
+                                const gameName = game.title || game.name || gameId.replace(/-/g, ' ');
+                                document.title = gameName + ' - Trioll';
+                                const header = document.getElementById('gameNameHeader');
+                                if (header) header.textContent = gameName;
+                                
+                                window.currentGame = game;
+                            } else {
+                                // Game not in list, try legacy CDN as last resort
+                                Logger.log('🎮 Emergency: Game not in list, trying legacy CDN');
+                                gameWrapper.innerHTML = `
+                                    <iframe 
+                                        id="gameIframe"
+                                        src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
+                                        style="width: 100%; height: 100%; border: none;"
+                                        allowfullscreen
+                                        allow="accelerometer; gyroscope; autoplay"
+                                    ></iframe>
+                                `;
+                            }
+                        })
+                        .catch(error => {
+                            Logger.error('Emergency loader API failed:', error);
+                            // Last resort - try legacy CDN
+                            gameWrapper.innerHTML = `
+                                <iframe 
+                                    id="gameIframe"
+                                    src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
+                                    style="width: 100%; height: 100%; border: none;"
+                                    allowfullscreen
+                                    allow="accelerometer; gyroscope; autoplay"
+                                ></iframe>
+                            `;
+                        });
                     
                     const gameName = gameId.replace(/-/g, ' ');
                     document.title = gameName + ' - Trioll';
