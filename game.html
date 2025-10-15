@@ -392,15 +392,52 @@
                     // Show game wrapper  
                     gameWrapper.style.display = 'block';
                     gameWrapper.classList.remove('hidden');
-                    gameWrapper.innerHTML = `
-                        <iframe 
-                            id="gameIframe"
-                            src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
-                            style="width: 100%; height: 100%; border: none;"
-                            allowfullscreen
-                            allow="accelerometer; gyroscope; autoplay"
-                        ></iframe>
-                    `;
+                    // Support both CDN domains - try to fetch game data first
+                    const tryLoadGame = async () => {
+                        try {
+                            const response = await fetch(`${Config.API_BASE_URL}/games/${gameId}`);
+                            if (response.ok) {
+                                const gameData = await response.json();
+                                const gameUrl = gameData.gameUrl || `https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html`;
+                                
+                                gameWrapper.innerHTML = `
+                                    <iframe 
+                                        id="gameIframe"
+                                        src="${gameUrl}"
+                                        style="width: 100%; height: 100%; border: none;"
+                                        allowfullscreen
+                                        allow="accelerometer; gyroscope; autoplay"
+                                    ></iframe>
+                                `;
+                                
+                                // Update game name if we have it
+                                if (gameData.title || gameData.name) {
+                                    const gameName = gameData.title || gameData.name;
+                                    document.title = gameName + ' - Trioll';
+                                    const header = document.getElementById('gameNameHeader');
+                                    if (header) {
+                                        header.textContent = gameName;
+                                    }
+                                }
+                            } else {
+                                throw new Error('Game not found');
+                            }
+                        } catch (error) {
+                            // Fallback to legacy CDN if API fails
+                            console.error('Failed to fetch game data:', error);
+                            gameWrapper.innerHTML = `
+                                <iframe 
+                                    id="gameIframe"
+                                    src="https://dk72g9i0333mv.cloudfront.net/${gameId}/index.html"
+                                    style="width: 100%; height: 100%; border: none;"
+                                    allowfullscreen
+                                    allow="accelerometer; gyroscope; autoplay"
+                                ></iframe>
+                            `;
+                        }
+                    };
+                    
+                    tryLoadGame();
                     
                     const gameName = gameId.replace(/-/g, ' ');
                     document.title = gameName + ' - Trioll';
