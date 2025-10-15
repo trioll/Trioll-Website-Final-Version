@@ -699,8 +699,86 @@
                 // setTimeout(showPurchaseModal, 120000);
                 
             } catch (error) {
-                Logger.error('Failed to load game:', error);
-                showError('Failed to load game. Please try again.');
+                Logger.error('Failed to load game details from API:', error);
+                
+                // If API fails, try to load game anyway with both CDNs
+                const loadingScreen = document.getElementById('loadingScreen');
+                const gameWrapper = document.getElementById('gameWrapper');
+                
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.classList.add('hidden');
+                }
+                
+                if (gameWrapper && gameId) {
+                    gameWrapper.style.display = 'block';
+                    gameWrapper.classList.remove('hidden');
+                    
+                    // Try loading from both CDNs
+                    let attempts = 0;
+                    const tryLoadGame = (useNewCDN = true) => {
+                        attempts++;
+                        const cdnDomain = useNewCDN ? 'https://dgq2nqysbn2z3.cloudfront.net' : 'https://dk72g9i0333mv.cloudfront.net';
+                        
+                        // For new CDN, try different possible filenames
+                        let gameUrl;
+                        if (useNewCDN && gameId.includes('-v')) {
+                            // Handle versioned game names like "deep-miner-v3-1760530951535"
+                            const baseName = gameId.substring(0, gameId.lastIndexOf('-v')).replace(/-/g, '_');
+                            gameUrl = `${cdnDomain}/${gameId}/${baseName}_game.html`;
+                        } else {
+                            gameUrl = `${cdnDomain}/${gameId}/index.html`;
+                        }
+                        
+                        Logger.log(`🎮 Attempting to load game from ${useNewCDN ? 'new' : 'legacy'} CDN:`, gameUrl);
+                        
+                        const iframe = document.createElement('iframe');
+                        iframe.id = 'gameIframe';
+                        iframe.src = gameUrl;
+                        iframe.style.width = '100%';
+                        iframe.style.height = '100%';
+                        iframe.style.border = 'none';
+                        iframe.setAttribute('allowfullscreen', '');
+                        iframe.setAttribute('allow', 'accelerometer; gyroscope; autoplay');
+                        
+                        iframe.onload = () => {
+                            Logger.log('✅ Game loaded successfully from', useNewCDN ? 'new' : 'legacy', 'CDN');
+                            window.gameStartTime = Date.now();
+                        };
+                        
+                        iframe.onerror = () => {
+                            Logger.error('❌ Failed to load from', useNewCDN ? 'new' : 'legacy', 'CDN');
+                            if (attempts === 1) {
+                                // Try legacy CDN
+                                gameWrapper.innerHTML = '';
+                                tryLoadGame(false);
+                            } else {
+                                showError('Failed to load game. The game may not be available.');
+                            }
+                        };
+                        
+                        gameWrapper.innerHTML = '';
+                        gameWrapper.appendChild(iframe);
+                    };
+                    
+                    // Start with new CDN
+                    tryLoadGame(true);
+                    
+                    // Set basic game info
+                    window.currentGame = {
+                        id: gameId,
+                        name: gameId.replace(/-/g, ' '),
+                        gameId: gameId
+                    };
+                    
+                    // Update page with basic info
+                    const gameName = gameId.replace(/-/g, ' ');
+                    document.title = `${gameName} - Play on Trioll`;
+                    const header = document.getElementById('gameNameHeader');
+                    if (header) header.textContent = gameName;
+                } else {
+                    showError('Failed to load game. Please try again later.');
+                }
             }
         });
         
